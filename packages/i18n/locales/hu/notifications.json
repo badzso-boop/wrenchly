@@ -1,0 +1,20 @@
+{
+  "notifications": {
+    "reminder_due": {
+      "title": "Karbantartás esedékes",
+      "body": "{{itemName}}: {{reminderTitle}}"
+    },
+    "reminder_overdue": {
+      "title": "Lejárt karbantartás",
+      "body": "{{itemName}}: {{reminderTitle}} már lejárt"
+    },
+    "low_stock": {
+      "title": "Alacsony készlet",
+      "body": "{{itemName}} hamarosan elfogy"
+    },
+    "weather_alert": {
+      "title": "Időjárás figyelmeztetés",
+      "body": "{{message}}"
+    }
+  }
+}

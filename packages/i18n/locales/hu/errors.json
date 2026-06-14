@@ -1,0 +1,31 @@
+{
+  "errors": {
+    "unauthorized": "Nincs jogosultságod ehhez a művelethez.",
+    "not_found": "A keresett elem nem található.",
+    "rate_limit_exceeded": "Túl sok kérés. Kérjük várj egy percet.",
+    "internal_server_error": "Szerverhiba. Kérjük próbáld újra.",
+    "validation_error": "Érvénytelen adatok.",
+    "item": {
+      "not_found": "Az elem nem található.",
+      "not_owner": "Csak a saját elemeidet szerkesztheted."
+    },
+    "maintenance": {
+      "not_found": "A karbantartási bejegyzés nem található.",
+      "not_owner": "Csak a saját bejegyzéseidet szerkesztheted."
+    },
+    "reminder": {
+      "not_found": "Az emlékeztető nem található.",
+      "trigger_config_invalid": "Érvénytelen emlékeztető beállítás."
+    },
+    "vehicle": {
+      "not_found": "A jármű profil nem található.",
+      "odometer_must_increase": "Az új km-óra állás nem lehet kisebb a jelenleginél.",
+      "vin_invalid": "Érvénytelen alvázszám formátum.",
+      "profile_already_exists": "Ehhez az elemhez már létezik jármű profil."
+    },
+    "upload": {
+      "failed": "A feltöltés sikertelen.",
+      "file_too_large": "A fájl mérete meghaladja a megengedett határt."
+    }
+  }
+}

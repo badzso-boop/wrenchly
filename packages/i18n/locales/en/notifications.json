@@ -1,0 +1,20 @@
+{
+  "notifications": {
+    "reminder_due": {
+      "title": "Maintenance Due",
+      "body": "{{itemName}}: {{reminderTitle}}"
+    },
+    "reminder_overdue": {
+      "title": "Overdue Maintenance",
+      "body": "{{itemName}}: {{reminderTitle}} is overdue"
+    },
+    "low_stock": {
+      "title": "Low Stock",
+      "body": "{{itemName}} is running low"
+    },
+    "weather_alert": {
+      "title": "Weather Alert",
+      "body": "{{message}}"
+    }
+  }
+}

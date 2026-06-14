@@ -1,0 +1,630 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─── CORE ────────────────────────────────────────────────────────────────────
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  name          String?
+  avatarUrl     String?
+  locale        String   @default("en")
+  timezone      String   @default("Europe/Budapest")
+  expoPushToken String?
+  calendarToken String?  @unique
+  defaultLat    Decimal? @db.Decimal(9, 6)
+  defaultLon    Decimal? @db.Decimal(9, 6)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  items             Item[]
+  reminders         Reminder[]
+  inventoryItems    InventoryItem[]
+  shoppingListItems ShoppingListItem[]
+  notificationPref  NotificationPreference?
+  customDomains     CustomDomain[]
+  onboardingState   OnboardingState?
+  shareExports      ShareExport[]
+  notifications     SmartNotification[]
+
+  @@map("users")
+}
+
+model Item {
+  id                String     @id @default(cuid())
+  userId            String
+  name              String
+  type              ItemType
+  subtype           String?
+  brand             String?
+  model             String?
+  description       String?
+  location          String?
+  status            ItemStatus @default(ACTIVE)
+  purchaseDate      DateTime?
+  purchasePrice     Decimal?   @db.Decimal(10, 2)
+  serialNumber      String?
+  warrantyExpiresAt DateTime?
+  coverPhotoUrl     String?
+  parentItemId      String?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parentItem         Item?               @relation("ItemChildren", fields: [parentItemId], references: [id])
+  childItems         Item[]              @relation("ItemChildren")
+  maintenanceRecords MaintenanceRecord[]
+  reminders          Reminder[]
+  photos             Photo[]
+  shareExports       ShareExport[]
+
+  vehicleProfile    VehicleProfile?
+  propertyProfile   PropertyProfile?
+  plantProfile      PlantProfile?
+  printer3dProfile  Printer3dProfile?
+  petProfile        PetProfile?
+  bicycleProfile    BicycleProfile?
+  aquariumProfile   AquariumProfile?
+  poolProfile       PoolProfile?
+  boatProfile       BoatProfile?
+  droneProfile      DroneProfile?
+  instrumentProfile InstrumentProfile?
+  solarProfile      SolarProfile?
+  customItemData    CustomItemData?
+
+  @@index([userId])
+  @@index([userId, type])
+  @@index([userId, status])
+  @@map("items")
+}
+
+enum ItemType {
+  VEHICLE
+  PROPERTY
+  PLANT
+  MACHINE
+  TOOL
+  DEVICE
+  PET
+  AQUARIUM
+  POOL
+  BOAT
+  DRONE
+  INSTRUMENT
+  BICYCLE
+  SOLAR
+  CUSTOM
+}
+
+enum ItemStatus {
+  ACTIVE
+  ARCHIVED
+  SOLD
+}
+
+model MaintenanceRecord {
+  id            String   @id @default(cuid())
+  itemId        String
+  userId        String
+  performedAt   DateTime
+  title         String
+  description   String?
+  category      String
+  costTotal     Decimal? @db.Decimal(10, 2)
+  costLabor     Decimal? @db.Decimal(10, 2)
+  isDiy         Boolean  @default(true)
+  timeSpentMin  Int?
+  odometerValue Int?
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  item   Item    @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  parts  Part[]
+  photos Photo[]
+
+  @@index([itemId])
+  @@index([itemId, performedAt])
+  @@index([userId, performedAt])
+  @@map("maintenance_records")
+}
+
+model Part {
+  id                  String   @id @default(cuid())
+  maintenanceRecordId String
+  name                String
+  category            String?
+  brand               String?
+  partNumber          String?
+  quantity            Decimal  @db.Decimal(10, 3)
+  unit                String
+  unitPrice           Decimal? @db.Decimal(10, 2)
+  totalPrice          Decimal? @db.Decimal(10, 2)
+  supplier            String?
+  url                 String?
+  notes               String?
+
+  maintenanceRecord MaintenanceRecord @relation(fields: [maintenanceRecordId], references: [id], onDelete: Cascade)
+
+  @@index([maintenanceRecordId])
+  @@map("parts")
+}
+
+model Photo {
+  id                  String    @id @default(cuid())
+  userId              String
+  itemId              String?
+  maintenanceRecordId String?
+  storageUrl          String
+  caption             String?
+  takenAt             DateTime?
+  createdAt           DateTime  @default(now())
+
+  item              Item?              @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  maintenanceRecord MaintenanceRecord? @relation(fields: [maintenanceRecordId], references: [id], onDelete: Cascade)
+
+  @@index([itemId])
+  @@index([maintenanceRecordId])
+  @@map("photos")
+}
+
+model Reminder {
+  id              String      @id @default(cuid())
+  itemId          String
+  userId          String
+  title           String
+  description     String?
+  triggerType     TriggerType
+  triggerConfig   Json
+  lastTriggeredAt DateTime?
+  nextTriggerAt   DateTime?
+  isActive        Boolean     @default(true)
+  notifyChannels  String[]    @default(["push"])
+  snoozeUntil     DateTime?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  user          User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  item          Item                @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  notifications SmartNotification[]
+
+  @@index([userId, nextTriggerAt])
+  @@index([itemId])
+  @@index([isActive, nextTriggerAt])
+  @@map("reminders")
+}
+
+enum TriggerType {
+  DATE
+  INTERVAL_DAYS
+  ODOMETER
+  CRON
+  WEATHER
+  COMPOUND
+}
+
+model SmartNotification {
+  id           String   @id @default(cuid())
+  userId       String
+  reminderId   String?
+  triggeredAt  DateTime @default(now())
+  channel      String
+  titleKey     String
+  bodyKey      String
+  bodyParams   Json?
+  actionUrl    String?
+  readAt       DateTime?
+  snoozedUntil DateTime?
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reminder Reminder? @relation(fields: [reminderId], references: [id], onDelete: SetNull)
+
+  @@index([userId, readAt, triggeredAt])
+  @@map("smart_notifications")
+}
+
+model NotificationPreference {
+  id             String  @id @default(cuid())
+  userId         String  @unique
+  pushEnabled    Boolean @default(true)
+  emailEnabled   Boolean @default(false)
+  quietHoursFrom Int?
+  quietHoursTo   Int?
+  advanceDays    Int     @default(3)
+  weeklyDigest   Boolean @default(false)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notification_preferences")
+}
+
+// ─── INVENTORY & SHOPPING ────────────────────────────────────────────────────
+
+model InventoryItem {
+  id           String    @id @default(cuid())
+  userId       String
+  name         String
+  category     String
+  brand        String?
+  spec         String?
+  quantity     Decimal   @db.Decimal(10, 3)
+  unit         String
+  location     String?
+  minQuantity  Decimal?  @db.Decimal(10, 3)
+  costPerUnit  Decimal?  @db.Decimal(10, 2)
+  expiryDate   DateTime?
+  purchaseDate DateTime?
+  notes        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, minQuantity])
+  @@map("inventory_items")
+}
+
+model ShoppingListItem {
+  id              String           @id @default(cuid())
+  userId          String
+  itemId          String?
+  name            String
+  quantity        Decimal?         @db.Decimal(10, 3)
+  unit            String?
+  estimatedPrice  Decimal?         @db.Decimal(10, 2)
+  storeSuggestion String?
+  url             String?
+  priority        ShoppingPriority @default(MEDIUM)
+  status          ShoppingStatus   @default(PENDING)
+  notes           String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@map("shopping_list_items")
+}
+
+enum ShoppingPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum ShoppingStatus {
+  PENDING
+  BOUGHT
+  CANCELLED
+}
+
+// ─── DOMAIN PROFILOK ─────────────────────────────────────────────────────────
+
+model VehicleProfile {
+  itemId             String   @id
+  make               String
+  model              String
+  year               Int?
+  variant            String?
+  vin                String?
+  licensePlate       String?
+  color              String?
+  fuelType           String?
+  engineDisplacement Int?
+  powerKw            Int?
+  transmission       String?
+  driveType          String?
+  oilSpec            String?
+  coolantType        String?
+  brakeFluidType     String?
+  tireSizeFront      String?
+  tireSizeRear       String?
+  tirePressureFront  Decimal? @db.Decimal(4, 2)
+  tirePressureRear   Decimal? @db.Decimal(4, 2)
+  currentOdometer    Int?
+  lastOdometerUpdate DateTime?
+
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@map("vehicle_profiles")
+}
+
+model PropertyProfile {
+  itemId       String  @id
+  propertyType String
+  address      String?
+  yearBuilt    Int?
+  floorAreaM2  Int?
+  floors       Int?
+  rooms        Int?
+  heatingType  String?
+  boilerBrand  String?
+  boilerModel  String?
+  roofType     String?
+
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@map("property_profiles")
+}
+
+model PlantProfile {
+  itemId              String    @id
+  commonName          String?
+  botanicalName       String?
+  variety             String?
+  locationType        String?
+  locationLabel       String?
+  plantedDate         DateTime?
+  sunRequirement      String?
+  wateringFreqSummer  Int?
+  wateringFreqWinter  Int?
+  soilType            String?
+  fertilizerType      String?
+  fertilizerFreqWeeks Int?
+  potSizeLiters       Int?
+  hardyZone           Int?
+  healthStatus        String?   @default("healthy")
+  lastWateredAt       DateTime?
+  lastFertilizedAt    DateTime?
+
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@map("plant_profiles")
+}
+
+model Printer3dProfile {
+  itemId           String   @id
+  brand            String
+  model            String
+  buildVolumeX     Int?
+  buildVolumeY     Int?
+  buildVolumeZ     Int?
+  nozzleDiameter   Decimal? @db.Decimal(3, 2)
+  defaultNozzleMat String?
+  firmwareVersion  String?
+  totalPrintHours  Decimal? @default(0) @db.Decimal(8, 2)
+  totalPrints      Int?     @default(0)
+  filamentConsumedG Int?    @default(0)
+
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@map("printer3d_profiles")
+}
+
+model PetProfile {
+  itemId          String    @id
+  petName         String
+  species         String?
+  breed           String?
+  dateOfBirth     DateTime?
+  gender          String?
+  weightKg        Decimal?  @db.Decimal(5, 2)
+  microchipNumber String?
+  vetName         String?
+  vetPhone        String?
+
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@map("pet_profiles")
+}
+
+model BicycleProfile {
+  itemId     String  @id
+  type       String?
+  brand      String?
+  model      String?
+  frameSize  String?
+  groupset   String?
+  brakeType  String?
+  chainBrand String?
+  chainKm    Int?    @default(0)
+  totalKm    Int?    @default(0)
+
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@map("bicycle_profiles")
+}
+
+model AquariumProfile {
+  itemId       String   @id
+  aquariumType String
+  volumeLiters Int?
+  dimensions   String?
+  setupDate    DateTime?
+  substrate    String?
+  lighting     String?
+  filtration   String?
+  co2System    Boolean  @default(false)
+  heaterBrand  String?
+  targetTempC  Decimal? @db.Decimal(4, 1)
+
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@map("aquarium_profiles")
+}
+
+model PoolProfile {
+  itemId         String   @id
+  poolType       String
+  volumeLiters   Int?
+  filtrationKind String?
+  pumpBrand      String?
+  heaterType     String?
+  targetTempC    Decimal? @db.Decimal(4, 1)
+  saltSystem     Boolean  @default(false)
+  uvSystem       Boolean  @default(false)
+
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@map("pool_profiles")
+}
+
+model BoatProfile {
+  itemId              String    @id
+  boatType            String
+  make                String?
+  model               String?
+  year                Int?
+  hullMaterial        String?
+  lengthM             Decimal?  @db.Decimal(5, 2)
+  engineBrand         String?
+  engineModel         String?
+  engineHours         Decimal?  @db.Decimal(8, 1)
+  fuelType            String?
+  fuelTankLiters      Int?
+  mooringLocation     String?
+  registrationExpires DateTime?
+  insuranceExpires    DateTime?
+
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@map("boat_profiles")
+}
+
+model DroneProfile {
+  itemId              String    @id
+  droneType           String
+  brand               String?
+  model               String?
+  serialNumber        String?
+  totalFlightHours    Decimal?  @db.Decimal(8, 2)
+  totalFlights        Int?      @default(0)
+  firmwareVersion     String?
+  registrationNumber  String?
+  registrationExpires DateTime?
+
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@map("drone_profiles")
+}
+
+model InstrumentProfile {
+  itemId         String  @id
+  instrumentType String
+  brand          String?
+  model          String?
+  year           Int?
+  serialNumber   String?
+  material       String?
+  stringGauge    String?
+  stringBrand    String?
+  tuning         String?
+
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@map("instrument_profiles")
+}
+
+model SolarProfile {
+  itemId                 String    @id
+  solarType              String
+  installer              String?
+  installationDate       DateTime?
+  panelCount             Int?
+  panelWattPeak          Int?
+  totalKwp               Decimal?  @db.Decimal(6, 2)
+  inverterBrand          String?
+  inverterModel          String?
+  batteryStorageKwh      Decimal?  @db.Decimal(6, 2)
+  annualYieldEstimateKwh Int?
+  monitoringUrl          String?
+
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@map("solar_profiles")
+}
+
+// ─── CUSTOM DOMAIN ───────────────────────────────────────────────────────────
+
+model CustomDomain {
+  id       String  @id @default(cuid())
+  userId   String
+  name     String
+  icon     String?
+  isPublic Boolean @default(false)
+
+  user   User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fields CustomDomainField[]
+  items  CustomItemData[]
+
+  @@index([userId])
+  @@index([isPublic])
+  @@map("custom_domains")
+}
+
+model CustomDomainField {
+  id             String    @id @default(cuid())
+  customDomainId String
+  name           String
+  key            String
+  fieldType      FieldType
+  unit           String?
+  required       Boolean   @default(false)
+  options        String[]
+  order          Int       @default(0)
+
+  customDomain CustomDomain @relation(fields: [customDomainId], references: [id], onDelete: Cascade)
+
+  @@index([customDomainId])
+  @@map("custom_domain_fields")
+}
+
+enum FieldType {
+  TEXT
+  NUMBER
+  DATE
+  BOOLEAN
+  ENUM
+  URL
+}
+
+model CustomItemData {
+  itemId         String @id
+  customDomainId String
+  data           Json
+
+  item         Item         @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  customDomain CustomDomain @relation(fields: [customDomainId], references: [id])
+
+  @@map("custom_item_data")
+}
+
+// ─── ONBOARDING ──────────────────────────────────────────────────────────────
+
+model OnboardingState {
+  userId          String    @id
+  completedAt     DateTime?
+  selectedHobbies String[]
+  currentStep     String?
+  stepData        Json?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("onboarding_states")
+}
+
+// ─── SHARING ─────────────────────────────────────────────────────────────────
+
+model ShareExport {
+  id        String    @id @default(cuid())
+  userId    String
+  itemId    String?
+  content   String    @db.Text
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+
+  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  item Item? @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("share_exports")
+}

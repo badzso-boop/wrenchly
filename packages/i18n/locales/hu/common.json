@@ -1,0 +1,20 @@
+{
+  "common": {
+    "save": "Mentés",
+    "cancel": "Mégse",
+    "delete": "Törlés",
+    "edit": "Szerkesztés",
+    "add": "Hozzáadás",
+    "close": "Bezárás",
+    "confirm": "Megerősítés",
+    "loading": "Betöltés...",
+    "error": "Hiba",
+    "success": "Sikeres",
+    "search": "Keresés",
+    "filter": "Szűrés",
+    "all": "Összes",
+    "yes": "Igen",
+    "no": "Nem",
+    "unknown": "Ismeretlen"
+  }
+}
