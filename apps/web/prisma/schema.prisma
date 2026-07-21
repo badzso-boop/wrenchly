@@ -143,6 +143,7 @@ enum ItemType {
   MACHINE
   TOOL
   DEVICE
+  PRINTER_3D
   PET
   AQUARIUM
   POOL

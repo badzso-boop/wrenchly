@@ -1,4 +1,4 @@
-import { type PrismaClient, type Item, type ItemStatus } from '@prisma/client'
+import { type PrismaClient, type Item, type ItemStatus, type ItemType } from '@prisma/client'
 
 export class ItemRepository {
   constructor(private db: PrismaClient) {}
@@ -21,7 +21,7 @@ export class ItemRepository {
   async create(data: {
     userId: string
     name: string
-    type: string
+    type: ItemType
     subtype?: string | null
     brand?: string | null
     model?: string | null
@@ -30,7 +30,7 @@ export class ItemRepository {
     description?: string | null
     coverPhotoUrl?: string | null
   }): Promise<Item> {
-    return this.db.item.create({ data: data as Parameters<typeof this.db.item.create>[0]['data'] })
+    return this.db.item.create({ data })
   }
 
   async update(

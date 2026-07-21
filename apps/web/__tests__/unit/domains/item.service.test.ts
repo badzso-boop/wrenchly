@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ItemService } from '@/server/domains/item/item.service'
 import { TRPCError } from '@trpc/server'
-import { ItemStatus } from '@prisma/client'
+import { ItemStatus, ItemType } from '@prisma/client'
 
 const mockItemRepo = {
   findById: vi.fn(),
@@ -38,7 +38,7 @@ describe('ItemService.getById', () => {
 
 describe('ItemService.create', () => {
   it('creates item with userId', async () => {
-    const input = { name: 'Ford Focus', type: 'VEHICLE' }
+    const input = { name: 'Ford Focus', type: ItemType.VEHICLE }
     const created = { id: '1', userId: 'user-1', ...input }
     mockItemRepo.create.mockResolvedValue(created)
 

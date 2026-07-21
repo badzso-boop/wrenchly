@@ -9,14 +9,16 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import type { ItemType } from '@prisma/client'
 
-const ITEM_TYPES = [
+const ITEM_TYPES: { value: ItemType; label: string }[] = [
   { value: 'VEHICLE', label: '🚗 Vehicle' },
   { value: 'PROPERTY', label: '🏠 Property' },
   { value: 'PLANT', label: '🌱 Plant' },
   { value: 'MACHINE', label: '⚙️ Machine' },
   { value: 'TOOL', label: '🔧 Tool' },
   { value: 'DEVICE', label: '📱 Device' },
+  { value: 'PRINTER_3D', label: '🖨️ 3D Printer' },
   { value: 'PET', label: '🐾 Pet' },
   { value: 'AQUARIUM', label: '🐠 Aquarium' },
   { value: 'POOL', label: '🏊 Pool' },
@@ -31,7 +33,7 @@ const ITEM_TYPES = [
 export function NewItemClient() {
   const router = useRouter()
   const [name, setName] = useState('')
-  const [type, setType] = useState('VEHICLE')
+  const [type, setType] = useState<ItemType>('VEHICLE')
   const [brand, setBrand] = useState('')
   const [model, setModel] = useState('')
   const [description, setDescription] = useState('')
@@ -75,7 +77,7 @@ export function NewItemClient() {
 
                 <div className="space-y-2">
                   <Label htmlFor="type">Type *</Label>
-                  <Select value={type} onValueChange={(v) => { if (v !== null) setType(v) }}>
+                  <Select value={type} onValueChange={(v) => { if (v !== null) setType(v as ItemType) }}>
                     <SelectTrigger id="type">
                       <SelectValue />
                     </SelectTrigger>

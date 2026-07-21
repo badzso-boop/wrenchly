@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { createTRPCRouter, protectedProcedure } from '@/server/trpc'
 import { ItemRepository } from './item.repository'
 import { ItemService } from './item.service'
-import { ItemStatus } from '@prisma/client'
+import { ItemStatus, ItemType } from '@prisma/client'
 
 export const itemRouter = createTRPCRouter({
   list: protectedProcedure
@@ -25,7 +25,7 @@ export const itemRouter = createTRPCRouter({
     .input(
       z.object({
         name: z.string().min(1).max(200),
-        type: z.string(),
+        type: z.nativeEnum(ItemType),
         subtype: z.string().optional(),
         brand: z.string().optional(),
         model: z.string().optional(),

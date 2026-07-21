@@ -1,6 +1,6 @@
 import { TRPCError } from '@trpc/server'
 import { type ItemRepository } from './item.repository'
-import { type Item, type ItemStatus } from '@prisma/client'
+import { type Item, type ItemStatus, type ItemType } from '@prisma/client'
 
 export class ItemService {
   constructor(private itemRepo: ItemRepository) {}
@@ -19,7 +19,7 @@ export class ItemService {
     userId: string,
     input: {
       name: string
-      type: string
+      type: ItemType
       subtype?: string | null
       brand?: string | null
       model?: string | null
