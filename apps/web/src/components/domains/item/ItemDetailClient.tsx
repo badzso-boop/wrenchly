@@ -6,6 +6,7 @@ import { ArrowLeft, Pencil, Bell, Car, FileText } from 'lucide-react'
 import { getProfileFields } from '@/server/domains/profile/profile.fields'
 import { MaintenanceList } from '@/components/domains/maintenance/MaintenanceList'
 import { AddMaintenanceForm } from '@/components/domains/maintenance/AddMaintenanceForm'
+import { ShareButton } from '@/components/domains/share/ShareButton'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -72,9 +73,12 @@ export function ItemDetailClient({ itemId }: { itemId: string }) {
               )}
             </div>
           </div>
-          <Button variant="ghost" size="sm" render={<Link href={`/items/${itemId}/edit`} />} className="shrink-0">
-            <Pencil className="h-4 w-4 mr-1" /> Edit
-          </Button>
+          <div className="flex items-center gap-1 shrink-0">
+            <ShareButton itemId={itemId} />
+            <Button variant="ghost" size="sm" render={<Link href={`/items/${itemId}/edit`} />}>
+              <Pencil className="h-4 w-4 mr-1" /> Edit
+            </Button>
+          </div>
         </div>
 
         {/* Tab nav */}
