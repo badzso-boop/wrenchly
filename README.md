@@ -66,11 +66,15 @@ mutathat — self-hosted konténerre, Neon-ra, RDS-re, vagy akár Supabase-nek *
 | Szolgáltatás | Mire | Env var(ok) |
 |---|---|---|
 | **Resend** | Tranzakciós email (emlékeztetők, stb.) — `src/server/domains/notification/email.service.ts` | `RESEND_API_KEY` |
-| **Upstash Redis** | Rate limiting a tRPC middleware-ben (`src/server/trpc.ts`) | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` |
 | **Expo Push** (`expo-server-sdk`) | Mobil push értesítések — `src/server/domains/notification/push.service.ts`. Nem igényel saját API-kulcsot, a felhasználó Expo push tokenjét használja. | – |
 | **Open-Meteo** (`api.open-meteo.com`) | Ingyenes, kulcs nélküli időjárás API a smart notification triggerekhez — `src/server/domains/weather/weather.service.ts` | – |
 
 A `ical-generator` és `cron-parser` csomagok lokálisan futnak, nincs hozzájuk külső szolgáltatás.
+
+*(Az eredeti Vercel-alapú tervben volt még egy Upstash Redis függőség tRPC rate limitinghez — annak
+csak azért volt szüksége külső Redis-re, mert szerverless függvényeknek nincs saját memóriájuk
+requestek között. Ez a self-hosted, egyetlen hosszan futó Node process esetén felesleges
+komplexitás lett volna, ezért kivettük — jelenleg nincs rate limiting a tRPC rétegben.)*
 
 **Fontos:** a rendszer nélkülük (dummy env-ekkel) nem indul el production módban — a
 `src/env.ts` (`@t3-oss/env-nextjs`) importkor validál, és minden fenti kulcsot kötelezőnek jelöl
@@ -105,7 +109,7 @@ külső Supabase/Neon/RDS projektre, bár ha mégis azt szeretnél, a `.env`-ben
 `DATABASE_URL`/`DIRECT_URL` (ld. `docker-compose.yml` a pontos fallback-logikáért).
 
 1. Hozz létre egy `.env` fájlt a repó gyökerében (**nem** `apps/web/` alatt — a `docker-compose.yml`
-   onnan olvassa) az `apps/web/.env.example` alapján, valós `BETTER_AUTH_SECRET`/Resend/Upstash
+   onnan olvassa) az `apps/web/.env.example` alapján, valós `BETTER_AUTH_SECRET`/Resend
    kulcsokkal.
 2. Build + indítás:
 

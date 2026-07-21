@@ -22,16 +22,14 @@ COPY . .
 # apps/web has no public/ dir yet — keep the later COPY from failing if that stays true.
 RUN mkdir -p apps/web/public
 # `next build` statically executes every route module once ("collecting page data"), which runs
-# top-level SDK constructors (Resend, Upstash, Better Auth) and env.ts's zod validation. None of
-# this is a live network call and none of it leaks into the running container — real secrets are
-# read fresh from process.env when the runner container starts. These placeholders only need to
-# satisfy the URL/min-length shape checks so the build can complete without real credentials.
+# top-level SDK constructors (Resend, Better Auth) and env.ts's zod validation. None of this is a
+# live network call and none of it leaks into the running container — real secrets are read fresh
+# from process.env when the runner container starts. These placeholders only need to satisfy the
+# URL/min-length shape checks so the build can complete without real credentials.
 ENV DATABASE_URL=postgresql://user:pass@localhost:5432/db \
     DIRECT_URL=postgresql://user:pass@localhost:5432/db \
     BETTER_AUTH_SECRET=build-placeholder-must-be-32-chars-min \
     RESEND_API_KEY=re_build_placeholder \
-    UPSTASH_REDIS_REST_URL=https://build-placeholder.upstash.io \
-    UPSTASH_REDIS_REST_TOKEN=build-placeholder \
     CRON_SECRET=build-placeholder-must-be-32-chars-min \
     NEXT_PUBLIC_APP_URL=http://localhost:3000
 RUN pnpm --filter @wrenchly/web db:generate

@@ -32,8 +32,6 @@ export default defineConfig({
       DIRECT_URL: 'postgresql://localhost/mock',
       BETTER_AUTH_SECRET: 'fake-better-auth-secret-e2e-mock-32-chars-min',
       RESEND_API_KEY: 'fake-resend-key-e2e-mock',
-      UPSTASH_REDIS_REST_URL: 'https://fake.upstash.io',
-      UPSTASH_REDIS_REST_TOKEN: 'fake-upstash-token-e2e-mock',
       CRON_SECRET: 'fake-cron-secret-at-least-32-chars-long',
     },
   },
