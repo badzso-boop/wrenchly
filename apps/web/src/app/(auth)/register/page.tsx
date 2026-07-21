@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
-import { createSupabaseBrowserClient } from '@/lib/supabase/client'
+import { authClient } from '@/lib/auth/client'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Wrench } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -13,18 +14,20 @@ export default function RegisterPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
-  const supabase = createSupabaseBrowserClient()
+  const router = useRouter()
 
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
     setError(null)
-    const { error } = await supabase.auth.signUp({ email, password, options: { data: { name } } })
-    if (error) { setError(error.message); setLoading(false); return }
-    setSuccess(true)
-    setLoading(false)
+    const { error } = await authClient.signUp.email({
+      email,
+      password,
+      name: name.trim() || email.split('@')[0]!,
+    })
+    if (error) { setError(error.message ?? 'Registration failed'); setLoading(false); return }
+    router.push('/dashboard')
   }
 
   return (
@@ -44,31 +47,24 @@ export default function RegisterPage() {
             <CardDescription>Start tracking your equipment for free</CardDescription>
           </CardHeader>
           <CardContent>
-            {success ? (
-              <div className="text-center py-4 space-y-2">
-                <p className="text-sm font-medium">Check your email</p>
-                <p className="text-sm text-muted-foreground">We sent a confirmation link to <strong>{email}</strong></p>
+            <form onSubmit={handleRegister} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Name</Label>
+                <Input id="name" value={name} onChange={(e) => setName((e.target as HTMLInputElement).value)} placeholder="Your name" autoComplete="name" />
               </div>
-            ) : (
-              <form onSubmit={handleRegister} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Name</Label>
-                  <Input id="name" value={name} onChange={(e) => setName((e.target as HTMLInputElement).value)} placeholder="Your name" autoComplete="name" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input id="email" type="email" value={email} onChange={(e) => setEmail((e.target as HTMLInputElement).value)} placeholder="you@example.com" required autoComplete="email" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
-                  <Input id="password" type="password" value={password} onChange={(e) => setPassword((e.target as HTMLInputElement).value)} placeholder="Min. 8 characters" required minLength={8} autoComplete="new-password" />
-                </div>
-                {error && <p className="text-sm text-destructive bg-destructive/10 rounded-md px-3 py-2">{error}</p>}
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? 'Creating account…' : 'Create account'}
-                </Button>
-              </form>
-            )}
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input id="email" type="email" value={email} onChange={(e) => setEmail((e.target as HTMLInputElement).value)} placeholder="you@example.com" required autoComplete="email" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <Input id="password" type="password" value={password} onChange={(e) => setPassword((e.target as HTMLInputElement).value)} placeholder="Min. 8 characters" required minLength={8} autoComplete="new-password" />
+              </div>
+              {error && <p className="text-sm text-destructive bg-destructive/10 rounded-md px-3 py-2">{error}</p>}
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? 'Creating account…' : 'Create account'}
+              </Button>
+            </form>
           </CardContent>
           <CardFooter className="justify-center text-sm text-muted-foreground">
             Already have an account?&nbsp;

@@ -1,4 +1,5 @@
 node_modules
+.pnpm-store
 .turbo
 dist
 .next
@@ -9,9 +10,6 @@ dist
 .env.local
 .env.test
 .env*.local
-
-# Supabase
-supabase/.temp
 
 # Playwright
 apps/web/tests/.auth/user.json

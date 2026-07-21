@@ -4,7 +4,7 @@ import superjson from 'superjson'
 import { ZodError } from 'zod'
 import { Ratelimit } from '@upstash/ratelimit'
 import { Redis } from '@upstash/redis'
-import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { auth } from '@/lib/auth/auth'
 import { db } from '@/server/db'
 
 let ratelimit: Ratelimit | null = null
@@ -22,23 +22,11 @@ function getRatelimit() {
 export async function createTRPCContext(opts: { req: NextRequest }) {
   const { req } = opts
 
-  let userId: string | null = null
+  // Handles both web (session cookie) and mobile (Authorization: Bearer <token>,
+  // via the `bearer` plugin) the same way.
+  const session = await auth.api.getSession({ headers: req.headers })
 
-  // Mobile: Bearer token in Authorization header
-  const authHeader = req.headers.get('authorization')
-  if (authHeader?.startsWith('Bearer ')) {
-    const token = authHeader.slice(7)
-    const supabase = await createSupabaseServerClient()
-    const { data } = await supabase.auth.getUser(token)
-    userId = data.user?.id ?? null
-  } else {
-    // Web: cookie-based session — always use getUser() not getSession()
-    const supabase = await createSupabaseServerClient()
-    const { data } = await supabase.auth.getUser()
-    userId = data.user?.id ?? null
-  }
-
-  return { db, userId, req }
+  return { db, userId: session?.user.id ?? null, req }
 }
 
 type Context = Awaited<ReturnType<typeof createTRPCContext>>

@@ -1,0 +1,70 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: wrenchly-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: wrenchly
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wrenchly}
+      POSTGRES_DB: wrenchly
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wrenchly"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  wrenchly:
+    build: .
+    container_name: wrenchly
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8086:3000"
+    env_file:
+      - .env
+    environment:
+      # Auth (Better Auth) now owns the users table directly, so Postgres no longer needs
+      # to be Supabase — defaults to the local `db` service above. Override in .env to point
+      # at a managed Postgres instead (Supabase, Neon, RDS, ...).
+      DATABASE_URL: ${DATABASE_URL:-postgresql://wrenchly:${POSTGRES_PASSWORD:-wrenchly}@db:5432/wrenchly}
+      DIRECT_URL: ${DIRECT_URL:-postgresql://wrenchly:${POSTGRES_PASSWORD:-wrenchly}@db:5432/wrenchly}
+    labels:
+      # Replaces Vercel's vercel.json crons — ofelia below calls these on the same schedule.
+      ofelia.enabled: "true"
+      ofelia.job-exec.reminders.schedule: "0 0 6 * * *"
+      ofelia.job-exec.reminders.command: "wget -qO- --header=\"Authorization: Bearer ${CRON_SECRET}\" http://localhost:3000/api/cron/reminders"
+      ofelia.job-exec.weather.schedule: "0 0 */6 * * *"
+      ofelia.job-exec.weather.command: "wget -qO- --header=\"Authorization: Bearer ${CRON_SECRET}\" http://localhost:3000/api/cron/weather"
+      ofelia.job-exec.inventory.schedule: "0 0 7 * * *"
+      ofelia.job-exec.inventory.command: "wget -qO- --header=\"Authorization: Bearer ${CRON_SECRET}\" http://localhost:3000/api/cron/inventory"
+
+  migrate:
+    build:
+      context: .
+      target: migrator
+    profiles: ["tools"]
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://wrenchly:${POSTGRES_PASSWORD:-wrenchly}@db:5432/wrenchly}
+      DIRECT_URL: ${DIRECT_URL:-postgresql://wrenchly:${POSTGRES_PASSWORD:-wrenchly}@db:5432/wrenchly}
+
+  ofelia:
+    image: mcuadros/ofelia:latest
+    container_name: wrenchly-cron
+    restart: unless-stopped
+    depends_on:
+      - wrenchly
+    command: daemon --docker
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    env_file:
+      - .env
+
+volumes:
+  db_data:

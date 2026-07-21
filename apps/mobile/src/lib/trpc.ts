@@ -2,7 +2,7 @@ import { createTRPCReact } from '@trpc/react-query'
 import { httpBatchLink } from '@trpc/client'
 import superjson from 'superjson'
 import type { AppRouter } from '@wrenchly/web/src/server/router'
-import { supabase } from './supabase'
+import { getStoredToken } from './auth'
 
 export const api = createTRPCReact<AppRouter>()
 
@@ -15,8 +15,7 @@ export function createTRPCClient() {
         url: `${API_URL}/api/trpc`,
         transformer: superjson,
         async headers() {
-          const { data } = await supabase.auth.getSession()
-          const token = data.session?.access_token
+          const token = await getStoredToken()
           return token ? { Authorization: `Bearer ${token}` } : {}
         },
       }),

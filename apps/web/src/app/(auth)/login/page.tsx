@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { createSupabaseBrowserClient } from '@/lib/supabase/client'
+import { authClient } from '@/lib/auth/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Wrench } from 'lucide-react'
@@ -15,14 +15,13 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const router = useRouter()
-  const supabase = createSupabaseBrowserClient()
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
     setError(null)
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) { setError(error.message); setLoading(false); return }
+    const { error } = await authClient.signIn.email({ email, password })
+    if (error) { setError(error.message ?? 'Sign in failed'); setLoading(false); return }
     router.push('/dashboard')
   }
 

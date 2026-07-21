@@ -48,7 +48,7 @@ const DEFAULT_HANDLERS: Record<string, Handler> = {
 export async function setupTrpcMocks(page: Page, overrides: Record<string, Handler> = {}) {
   const handlers = { ...DEFAULT_HANDLERS, ...overrides }
 
-  // Add bypass header to all requests (including navigation) so middleware skips Supabase auth
+  // Add bypass header to all requests (including navigation) so middleware/pages skip real auth
   await page.setExtraHTTPHeaders({ 'x-e2e-bypass': 'wrenchly-e2e' })
 
   await page.route('**', async (route) => {
