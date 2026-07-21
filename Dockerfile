@@ -37,6 +37,16 @@ ENV DATABASE_URL=postgresql://user:pass@localhost:5432/db \
 RUN pnpm --filter @wrenchly/web db:generate
 RUN pnpm --filter @wrenchly/web build
 
+# The runner below ships the traced Prisma *client* but not the `prisma` CLI, so it can't run
+# migrations. This stage reuses the full builder (which has the CLI + schema) for that instead;
+# run it with `docker compose run --rm migrate` (see docker-compose.yml). Placed BEFORE `runner`
+# on purpose — the last stage in the file is Docker's default build target when no `--target`/
+# `target:` is given, and `runner` (the actual app) must stay that default, not this one.
+FROM builder AS migrator
+WORKDIR /app/apps/web
+ENTRYPOINT ["npx", "prisma"]
+CMD ["migrate", "deploy"]
+
 FROM base AS runner
 WORKDIR /app
 ENV NODE_ENV=production
@@ -54,11 +64,3 @@ ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
 CMD ["node", "apps/web/server.js"]
-
-# The standalone runner above only ships the traced Prisma *client*, not the `prisma` CLI — it
-# can't run migrations. This stage reuses the full builder (which has the CLI + schema) for that;
-# run it with `docker compose run --rm migrate` (see docker-compose.yml).
-FROM builder AS migrator
-WORKDIR /app/apps/web
-ENTRYPOINT ["npx", "prisma"]
-CMD ["migrate", "deploy"]

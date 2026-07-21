@@ -16,7 +16,9 @@ services:
       retries: 10
 
   wrenchly:
-    build: .
+    build:
+      context: .
+      target: runner
     container_name: wrenchly
     restart: unless-stopped
     depends_on:
