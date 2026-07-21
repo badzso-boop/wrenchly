@@ -6,6 +6,12 @@ import { ReminderService } from './reminder.service'
 const TriggerConfigSchema = z.record(z.unknown())
 
 export const reminderRouter = createTRPCRouter({
+  list: protectedProcedure.query(({ ctx }) => {
+    const repo = new ReminderRepository(ctx.db)
+    const service = new ReminderService(repo)
+    return service.list(ctx.userId)
+  }),
+
   getByItemId: protectedProcedure
     .input(z.object({ itemId: z.string() }))
     .query(({ ctx, input }) => {

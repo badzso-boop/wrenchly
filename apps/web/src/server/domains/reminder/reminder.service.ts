@@ -47,6 +47,10 @@ export function calculateNextTrigger(
 export class ReminderService {
   constructor(private reminderRepo: ReminderRepository) {}
 
+  async list(userId: string) {
+    return this.reminderRepo.findActiveByUserId(userId)
+  }
+
   async getByItemId(itemId: string, userId: string): Promise<Reminder[]> {
     return this.reminderRepo.findByItemId(itemId, userId)
   }
