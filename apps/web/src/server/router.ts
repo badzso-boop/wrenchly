@@ -8,6 +8,7 @@ import { userRouter } from '@/server/domains/user/user.handler'
 import { inventoryRouter } from '@/server/domains/inventory/inventory.handler'
 import { profileRouter } from '@/server/domains/profile/profile.handler'
 import { customDomainRouter } from '@/server/domains/custom-domain/custom-domain.handler'
+import { onboardingRouter } from '@/server/domains/onboarding/onboarding.handler'
 
 export const appRouter = createTRPCRouter({
   item: itemRouter,
@@ -19,6 +20,7 @@ export const appRouter = createTRPCRouter({
   inventory: inventoryRouter,
   profile: profileRouter,
   customDomain: customDomainRouter,
+  onboarding: onboardingRouter,
 })
 
 export type AppRouter = typeof appRouter
