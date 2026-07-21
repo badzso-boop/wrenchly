@@ -2,7 +2,8 @@
 import { api } from '@/lib/trpc/client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { ArrowLeft, Pencil, Bell, Car } from 'lucide-react'
+import { ArrowLeft, Pencil, Bell, Car, FileText } from 'lucide-react'
+import { getProfileFields } from '@/server/domains/profile/profile.fields'
 import { MaintenanceList } from '@/components/domains/maintenance/MaintenanceList'
 import { AddMaintenanceForm } from '@/components/domains/maintenance/AddMaintenanceForm'
 import { useState } from 'react'
@@ -39,11 +40,13 @@ export function ItemDetailClient({ itemId }: { itemId: string }) {
   )
 
   const isVehicle = item.data.type === 'VEHICLE'
+  const hasGenericProfile = getProfileFields(item.data.type) !== null
 
   const tabs = [
     { href: `/items/${itemId}`, label: 'Maintenance' },
     { href: `/items/${itemId}/reminders`, label: 'Reminders', icon: Bell },
     ...(isVehicle ? [{ href: `/items/${itemId}/vehicle`, label: 'Vehicle', icon: Car }] : []),
+    ...(hasGenericProfile ? [{ href: `/items/${itemId}/profile`, label: 'Profile', icon: FileText }] : []),
   ]
 
   return (

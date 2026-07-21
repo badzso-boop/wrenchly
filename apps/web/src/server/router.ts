@@ -6,6 +6,7 @@ import { vehicleRouter } from '@/server/domains/vehicle/vehicle.handler'
 import { notificationRouter } from '@/server/domains/notification/notification.handler'
 import { userRouter } from '@/server/domains/user/user.handler'
 import { inventoryRouter } from '@/server/domains/inventory/inventory.handler'
+import { profileRouter } from '@/server/domains/profile/profile.handler'
 
 export const appRouter = createTRPCRouter({
   item: itemRouter,
@@ -15,6 +16,7 @@ export const appRouter = createTRPCRouter({
   notification: notificationRouter,
   user: userRouter,
   inventory: inventoryRouter,
+  profile: profileRouter,
 })
 
 export type AppRouter = typeof appRouter
