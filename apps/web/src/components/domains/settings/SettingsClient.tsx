@@ -1,8 +1,10 @@
 'use client'
 import { api } from '@/lib/trpc/client'
+import { authClient } from '@/lib/auth/client'
+import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import { Copy, Check, RefreshCw, Calendar } from 'lucide-react'
+import { Copy, Check, RefreshCw, Calendar, LogOut } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -20,6 +22,8 @@ const TIMEZONES = [
 ]
 
 export function SettingsClient() {
+  const router = useRouter()
+  const [signingOut, setSigningOut] = useState(false)
   const user = api.user.getMe.useQuery()
   const notifPref = api.user.getNotifPref.useQuery()
   const calendarToken = api.user.getOrCreateCalendarToken.useQuery()
@@ -30,6 +34,12 @@ export function SettingsClient() {
   const upsertPref = api.user.upsertNotifPref.useMutation({ onSuccess: () => { notifPref.refetch(); toast.success('Preferences saved') } })
 
   const [copied, setCopied] = useState(false)
+
+  async function handleSignOut() {
+    setSigningOut(true)
+    await authClient.signOut()
+    router.push('/login')
+  }
 
   function copyFeedUrl() {
     if (!calendarToken.data?.feedUrl) return
@@ -265,6 +275,24 @@ export function SettingsClient() {
           </Card>
 
           <CustomDomainManager />
+
+          {/* Account */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Account</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Button
+                variant="outline"
+                className="w-full"
+                disabled={signingOut}
+                onClick={handleSignOut}
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                {signingOut ? 'Signing out…' : 'Sign out'}
+              </Button>
+            </CardContent>
+          </Card>
 
         </div>
       </div>
