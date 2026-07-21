@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { getProfileFields } from '@/server/domains/profile/profile.fields'
 import { ProfileClient } from './ProfileClient'
+import { CustomProfileClient } from '@/components/domains/custom-domain/CustomProfileClient'
 
 export function ProfilePageClient({ itemId }: { itemId: string }) {
   const item = api.item.getById.useQuery({ id: itemId })
@@ -26,8 +27,11 @@ export function ProfilePageClient({ itemId }: { itemId: string }) {
       <div className="flex-1 overflow-auto px-6 py-6 animate-in fade-in-0 duration-300">
         <div className="max-w-2xl mx-auto">
           {item.isLoading && <Skeleton className="h-48 rounded-xl" />}
-          {item.data && fields && <ProfileClient itemId={itemId} fields={fields} />}
-          {item.data && !fields && (
+          {item.data && item.data.type === 'CUSTOM' && <CustomProfileClient itemId={itemId} />}
+          {item.data && item.data.type !== 'CUSTOM' && fields && (
+            <ProfileClient itemId={itemId} fields={fields} />
+          )}
+          {item.data && item.data.type !== 'CUSTOM' && !fields && (
             <p className="text-muted-foreground text-sm">This item type has no extended profile.</p>
           )}
         </div>

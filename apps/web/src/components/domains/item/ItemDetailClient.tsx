@@ -40,7 +40,7 @@ export function ItemDetailClient({ itemId }: { itemId: string }) {
   )
 
   const isVehicle = item.data.type === 'VEHICLE'
-  const hasGenericProfile = getProfileFields(item.data.type) !== null
+  const hasGenericProfile = item.data.type === 'CUSTOM' || getProfileFields(item.data.type) !== null
 
   const tabs = [
     { href: `/items/${itemId}`, label: 'Maintenance' },

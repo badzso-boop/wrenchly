@@ -3,51 +3,11 @@ import { api } from '@/lib/trpc/client'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { ProfileFieldDef } from '@/server/domains/profile/profile.fields'
-
-type FormValues = Record<string, string | boolean>
-
-function toFormValue(value: unknown): string | boolean {
-  if (typeof value === 'boolean') return value
-  if (value instanceof Date) return value.toISOString().slice(0, 10)
-  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(value)) return value.slice(0, 10)
-  if (value === null || value === undefined) return ''
-  return String(value)
-}
-
-function toValues(fields: ProfileFieldDef[], data: Record<string, unknown> | null | undefined): FormValues {
-  const values: FormValues = {}
-  for (const field of fields) {
-    values[field.key] = field.type === 'boolean' ? Boolean(data?.[field.key]) : toFormValue(data?.[field.key])
-  }
-  return values
-}
-
-function toPayload(fields: ProfileFieldDef[], values: FormValues): Record<string, unknown> {
-  const payload: Record<string, unknown> = {}
-  for (const field of fields) {
-    const raw = values[field.key]
-    if (field.type === 'boolean') { payload[field.key] = Boolean(raw); continue }
-    if (raw === '' || raw === undefined) { payload[field.key] = null; continue }
-    if (field.type === 'number' || field.type === 'decimal') payload[field.key] = Number(raw)
-    else if (field.type === 'date') payload[field.key] = new Date(String(raw))
-    else payload[field.key] = raw
-  }
-  return payload
-}
-
-function formatDisplayValue(field: ProfileFieldDef, value: unknown): string | null {
-  if (value === null || value === undefined || value === '') return null
-  if (field.type === 'boolean') return value ? 'Yes' : 'No'
-  if (field.type === 'date') return new Date(String(value)).toLocaleDateString()
-  return field.unit ? `${value} ${field.unit}` : String(value)
-}
+import { ProfileFieldInput } from './ProfileFieldInput'
+import { toValues, toPayload, formatDisplayValue, type FormValues } from './profile-form-utils'
 
 export function ProfileClient({ itemId, fields }: { itemId: string; fields: ProfileFieldDef[] }) {
   const utils = api.useUtils()
@@ -66,10 +26,6 @@ export function ProfileClient({ itemId, fields }: { itemId: string; fields: Prof
   function openEdit() {
     setValues(toValues(fields, profile.data))
     setEditing(true)
-  }
-
-  function setValue(key: string, value: string | boolean) {
-    setValues((prev) => ({ ...prev, [key]: value }))
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -122,42 +78,12 @@ export function ProfileClient({ itemId, fields }: { itemId: string; fields: Prof
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               {fields.map((field) => (
-                <div key={field.key} className="space-y-2">
-                  <Label htmlFor={field.key}>
-                    {field.label}{field.required ? ' *' : ''}{field.unit ? ` (${field.unit})` : ''}
-                  </Label>
-
-                  {field.type === 'boolean' ? (
-                    <Switch
-                      checked={Boolean(values[field.key])}
-                      onCheckedChange={(checked) => setValue(field.key, checked)}
-                    />
-                  ) : field.type === 'select' ? (
-                    <Select
-                      value={String(values[field.key] ?? '')}
-                      onValueChange={(v) => { if (v !== null) setValue(field.key, v) }}
-                    >
-                      <SelectTrigger id={field.key}><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {(field.options ?? []).map((opt) => (
-                          <SelectItem key={opt} value={opt}>{opt}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <Input
-                      id={field.key}
-                      type={
-                        field.type === 'number' || field.type === 'decimal' ? 'number'
-                          : field.type === 'date' ? 'date' : 'text'
-                      }
-                      step={field.type === 'decimal' ? 'any' : undefined}
-                      value={String(values[field.key] ?? '')}
-                      onChange={(e) => setValue(field.key, (e.target as HTMLInputElement).value)}
-                      required={field.required}
-                    />
-                  )}
-                </div>
+                <ProfileFieldInput
+                  key={field.key}
+                  field={field}
+                  values={values}
+                  onChange={(key, value) => setValues((prev) => ({ ...prev, [key]: value }))}
+                />
               ))}
 
               {upsert.error && <p className="text-sm text-destructive">{upsert.error.message}</p>}

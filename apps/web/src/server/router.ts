@@ -7,6 +7,7 @@ import { notificationRouter } from '@/server/domains/notification/notification.h
 import { userRouter } from '@/server/domains/user/user.handler'
 import { inventoryRouter } from '@/server/domains/inventory/inventory.handler'
 import { profileRouter } from '@/server/domains/profile/profile.handler'
+import { customDomainRouter } from '@/server/domains/custom-domain/custom-domain.handler'
 
 export const appRouter = createTRPCRouter({
   item: itemRouter,
@@ -17,6 +18,7 @@ export const appRouter = createTRPCRouter({
   user: userRouter,
   inventory: inventoryRouter,
   profile: profileRouter,
+  customDomain: customDomainRouter,
 })
 
 export type AppRouter = typeof appRouter
