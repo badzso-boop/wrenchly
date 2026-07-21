@@ -9,20 +9,24 @@ Monorepo: webes app (Next.js) + mobil app (Expo/React Native), közös típusokk
 
 ## Funkciók
 
-- **Item tracking** tetszőleges tárgytípusra, típus-specifikus profillal (`VehicleProfile`,
-  `PropertyProfile`, `PlantProfile`, `Printer3dProfile`, `PetProfile`, `BicycleProfile`,
-  `AquariumProfile`, `PoolProfile`, `BoatProfile`, `DroneProfile`, `InstrumentProfile`,
-  `SolarProfile`)
-- **Egyéni domain/mező** támogatás (`CustomDomain`, `CustomDomainField`, `CustomItemData`) azokra
-  az esetekre, amikre nincs beépített profil
+- **Item tracking** tetszőleges tárgytípusra:
+  - **Jármű** (`VehicleProfile`) — saját, bespoke domain, km-alapú emlékeztetőkkel
+  - **11 további beépített típus** (Property, Plant, Printer3d, Pet, Bicycle, Aquarium, Pool,
+    Boat, Drone, Instrument, Solar) — egy generikus, séma-vezérelt profil-motoron keresztül
+    (ld. lentebb)
+  - **Egyéni domain/mező rendszer** (`CustomDomain`/`CustomDomainField`/`CustomItemData`) — ha egy
+    tárgytípus nincs beépítve, a Settings oldalon saját mezőkkel definiálhatsz egyet
 - **Karbantartási napló** (`MaintenanceRecord`) alkatrészekkel (`Part`) és fotókkal (`Photo`)
-- **Emlékeztetők** (`Reminder`) dátum-, intervallum- vagy cron-alapú triggerrel, csendes órákkal
+- **Emlékeztetők** (`Reminder`) dátum-, intervallum-, cron- vagy időjárás-alapú triggerrel, csendes órákkal
 - **Smart notification** — időjárás-alapú triggerek (pl. fagyveszély, locsolási emlékeztető)
 - **Inventory / bevásárlólista** (`InventoryItem`, `ShoppingListItem`)
 - **Naptár export** (iCal/.ics) az emlékeztetőkhöz
 - **Push + email értesítések**, felhasználói értesítési preferenciákkal
-- **Onboarding flow**, exportálható/megosztható item-adatlapok (`ShareExport`)
-- Lokalizáció: `hu` + `en`
+- **Onboarding flow** regisztráció után (mit szeretnél nyilvántartani)
+- **Megosztható item-adatlapok** (`ShareExport`) — auth nélkül elérhető publikus link egy item
+  karbantartási előzményeivel (pl. eladáshoz)
+- **Kijelentkezés** webről és mobilról
+- Lokalizáció: `hu` + `en` (fordítási csomag megvan, a UI szövegek jelenleg angolul vannak hardcode-olva)
 
 ## Tech stack
 
@@ -80,6 +84,27 @@ komplexitás lett volna, ezért kivettük — jelenleg nincs rate limiting a tRP
 `src/env.ts` (`@t3-oss/env-nextjs`) importkor validál, és minden fenti kulcsot kötelezőnek jelöl
 (a `BETTER_AUTH_SECRET`-et is — generáld pl. `openssl rand -base64 32`-vel).
 Fejlesztéshez/build teszthez a `SKIP_ENV_VALIDATION=true` env-vel meg lehet kerülni.
+
+## Generikus profil-motor (11 item-típus)
+
+A `Vehicle` domain (`src/server/domains/vehicle/`) egy önálló, kézzel írt handler/service/repository
+— ez marad a "flagship" implementáció. A másik 11 beépített típus (Property, Plant, Printer3d, Pet,
+Bicycle, Aquarium, Pool, Boat, Drone, Instrument, Solar) viszont szinte azonos mintát követ a Prisma
+sémában (1:1 tábla az `Item`-hez, lapos opcionális mezők) — ahelyett, hogy ugyanazt a domaint 11x
+lemásoltuk volna, egyetlen generikus motor szolgálja ki mindet:
+
+- `src/server/domains/profile/profile.fields.ts` — statikus field-metadata regiszter típusonként
+  (label, input-típus, mértékegység, opciók) — ez vezérli mind a validációt, mind a UI-t
+- `src/server/domains/profile/profile.repository.ts` — `switch (itemType)` dispatch a megfelelő
+  Prisma modellre, a Decimal mezőket sima számmá alakítva (hogy superjson-nel gond nélkül
+  szerializálódjanak)
+- `components/domains/profile/ProfileClient.tsx` + `ProfileFieldInput.tsx` — egyetlen, mező-vezérelt
+  view/edit komponens, a `/items/[id]/profile` route mind a 11 típusnál ugyanezt használja
+
+A **Custom Domain rendszer** (felhasználó-definiált típusok) ugyanezt a `ProfileFieldInput`/
+form-util réteget használja újra — a `CustomDomainField.fieldType` (TEXT/NUMBER/DATE/BOOLEAN/
+ENUM/URL) egyszerűen ugyanarra a `text/number/date/boolean/select` renderer-re map-elődik, amit a
+beépített típusok is használnak.
 
 ## Lokális fejlesztés
 
@@ -166,3 +191,17 @@ wrenchly/
 ```
 
 Részletes architektúra-leírásért ld. `wrenchly-architecture.md`, adatmodellért `wrenchly-schema.md`.
+
+## Mobil app állapota
+
+Az alap navigáció megvan: bejelentkezés, dashboard, item lista, item létrehozás (`items/new`), item
+részletek + emlékeztetők (`items/[id]`), emlékeztetők tab (`reminder.list`), settings tab
+kijelentkezéssel. A profil-szerkesztés (jármű/generikus profil/custom domain) és a karbantartási
+napló egyelőre **csak weben** érhető el — mobilon nincs hozzá képernyő.
+
+`pnpm --filter @wrenchly/mobile typecheck` jelenleg is hibázik, de ezek pre-existing, a fenti
+funkcióktól független gapek: hiányzó NativeWind `className` típusaugmentáció, a tRPC router néhány
+property-neve ütközik a kliens beépített metódusaival (`useContext`/`useUtils`/`Provider`), és
+hiányzik a `@types/node`. Mivel ebben a környezetben nincs Expo szimulátor/eszköz, a mobil UI-t nem
+lehetett vizuálisan leellenőrizni — a fenti navigációs javítások és új képernyők logikailag
+konzisztensek a webes tRPC-hívásokkal, de valós eszközön még nem lettek kipróbálva.
