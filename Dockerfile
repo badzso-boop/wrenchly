@@ -26,12 +26,18 @@ RUN mkdir -p apps/web/public
 # live network call and none of it leaks into the running container — real secrets are read fresh
 # from process.env when the runner container starts. These placeholders only need to satisfy the
 # URL/min-length shape checks so the build can complete without real credentials.
+#
+# NEXT_PUBLIC_APP_URL is the one exception: Next.js inlines NEXT_PUBLIC_* vars into the compiled
+# bundle at build time, so whatever value is set here is permanent — the runtime `.env` value is
+# never read for it. It must be the real public URL, not a throwaway placeholder, or Better Auth's
+# baseURL ends up wrong and it rejects every request with "Invalid origin".
+ARG NEXT_PUBLIC_APP_URL=https://wrenchly.ujjweb.hu
 ENV DATABASE_URL=postgresql://user:pass@localhost:5432/db \
     DIRECT_URL=postgresql://user:pass@localhost:5432/db \
     BETTER_AUTH_SECRET=build-placeholder-must-be-32-chars-min \
     RESEND_API_KEY=re_build_placeholder \
     CRON_SECRET=build-placeholder-must-be-32-chars-min \
-    NEXT_PUBLIC_APP_URL=http://localhost:3000
+    NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
 RUN pnpm --filter @wrenchly/web db:generate
 RUN pnpm --filter @wrenchly/web build
 
