@@ -74,13 +74,17 @@ test.describe('Calendar Integration — Settings page', () => {
 
   test('helper text mentions Google Calendar', async ({ page }) => {
     await page.goto('/settings')
-    await expect(page.getByText(/Google Calendar/i)).toBeVisible()
+    await expect(
+      page.getByText('Subscribe to your reminders in Google Calendar, Apple Calendar, or Outlook')
+    ).toBeVisible()
   })
 
   test('supported apps list is shown', async ({ page }) => {
     await page.goto('/settings')
-    await expect(page.getByText(/Apple Calendar/i)).toBeVisible()
-    await expect(page.getByText(/Outlook/i)).toBeVisible()
+    const supportedApps = page.getByText(/Works with:/i)
+    await expect(supportedApps).toBeVisible()
+    await expect(supportedApps).toContainText('Apple Calendar')
+    await expect(supportedApps).toContainText('Outlook')
   })
 })
 
