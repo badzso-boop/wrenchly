@@ -5,6 +5,7 @@ export type ItemType =
   | 'MACHINE'
   | 'TOOL'
   | 'DEVICE'
+  | 'PRINTER_3D'
   | 'PET'
   | 'AQUARIUM'
   | 'POOL'

@@ -2,8 +2,8 @@ import { Stack, router } from 'expo-router'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { View } from 'react-native'
-import { api, createTRPCClient } from '@/lib/trpc'
-import { getStoredToken } from '@/lib/auth'
+import { api, createTRPCClient } from '~/lib/trpc'
+import { getStoredToken } from '~/lib/auth'
 import '../global.css'
 
 export default function RootLayout() {

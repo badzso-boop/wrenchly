@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { View, Text, TextInput, Pressable, Alert } from 'react-native'
 import { router } from 'expo-router'
-import { signInWithPassword } from '@/lib/auth'
+import { signInWithPassword } from '~/lib/auth'
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('')

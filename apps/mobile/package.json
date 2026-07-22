@@ -35,6 +35,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.25.0",
+    "@types/node": "^22.15.29",
     "@types/react": "~18.3.0",
     "@wrenchly/web": "workspace:*",
     "tailwindcss": "^3.4.17",

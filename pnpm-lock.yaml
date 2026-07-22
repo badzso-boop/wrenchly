@@ -96,6 +96,9 @@ importers:
       '@babel/core':
         specifier: ^7.25.0
         version: 7.29.7
+      '@types/node':
+        specifier: ^22.15.29
+        version: 22.19.21
       '@types/react':
         specifier: ^19.1.6
         version: 19.2.17
@@ -8573,7 +8576,7 @@ snapshots:
 
   '@react-navigation/routers@7.6.0':
     dependencies:
-      nanoid: 3.3.12
+      nanoid: 3.3.16
 
   '@rolldown/pluginutils@1.0.0-beta.27': {}
 
@@ -11919,7 +11922,7 @@ snapshots:
 
   postcss@8.4.31:
     dependencies:
-      nanoid: 3.3.12
+      nanoid: 3.3.16
       picocolors: 1.1.1
       source-map-js: 1.2.1
 
@@ -13067,7 +13070,7 @@ snapshots:
       esbuild: 0.27.7
       fdir: 6.5.0(picomatch@4.0.4)
       picomatch: 4.0.4
-      postcss: 8.5.15
+      postcss: 8.5.20
       rollup: 4.61.1
       tinyglobby: 0.2.17
     optionalDependencies:

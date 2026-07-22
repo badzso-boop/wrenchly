@@ -1,6 +1,6 @@
 import { View, Text, ScrollView } from 'react-native'
 import { useLocalSearchParams } from 'expo-router'
-import { api } from '@/lib/trpc'
+import { api } from '~/lib/trpc'
 
 export default function ItemDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()

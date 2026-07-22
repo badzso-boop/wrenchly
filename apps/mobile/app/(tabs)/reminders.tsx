@@ -1,6 +1,6 @@
 import { View, Text, ScrollView, Pressable } from 'react-native'
 import { router } from 'expo-router'
-import { api } from '@/lib/trpc'
+import { api } from '~/lib/trpc'
 
 export default function RemindersScreen() {
   const reminders = api.reminder.list.useQuery()

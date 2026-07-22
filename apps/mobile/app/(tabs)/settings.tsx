@@ -1,7 +1,7 @@
 import { View, Text, ScrollView, Pressable } from 'react-native'
 import { router } from 'expo-router'
-import { api } from '@/lib/trpc'
-import { signOut } from '@/lib/auth'
+import { api } from '~/lib/trpc'
+import { signOut } from '~/lib/auth'
 
 export default function SettingsScreen() {
   const user = api.user.getMe.useQuery()

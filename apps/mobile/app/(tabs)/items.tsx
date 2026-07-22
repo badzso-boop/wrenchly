@@ -1,5 +1,5 @@
 import { View, Text, ScrollView, Pressable } from 'react-native'
-import { api } from '@/lib/trpc'
+import { api } from '~/lib/trpc'
 import { router } from 'expo-router'
 
 export default function ItemsScreen() {

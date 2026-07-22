@@ -1,16 +1,17 @@
 import { useState } from 'react'
 import { View, Text, TextInput, Pressable, ScrollView, Alert } from 'react-native'
 import { router } from 'expo-router'
-import { api } from '@/lib/trpc'
+import { api } from '~/lib/trpc'
+import type { ItemType } from '@wrenchly/types'
 
-const ITEM_TYPES = [
+const ITEM_TYPES: ItemType[] = [
   'VEHICLE', 'PROPERTY', 'PLANT', 'PET', 'BICYCLE', 'PRINTER_3D',
   'AQUARIUM', 'POOL', 'BOAT', 'DRONE', 'INSTRUMENT', 'SOLAR', 'CUSTOM',
 ]
 
 export default function NewItemScreen() {
   const [name, setName] = useState('')
-  const [type, setType] = useState('VEHICLE')
+  const [type, setType] = useState<ItemType>('VEHICLE')
   const utils = api.useUtils()
 
   const create = api.item.create.useMutation({

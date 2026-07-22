@@ -1,5 +1,5 @@
 import { View, Text, ScrollView } from 'react-native'
-import { api } from '@/lib/trpc'
+import { api } from '~/lib/trpc'
 
 export default function DashboardScreen() {
   const items = api.item.list.useQuery({})
