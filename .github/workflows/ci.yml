@@ -99,6 +99,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Generate Prisma client
+        run: pnpm --filter @wrenchly/web db:generate
+
       - name: Run Prisma migrations
         run: pnpm --filter @wrenchly/web db:migrate
 
@@ -121,6 +124,12 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm --filter @wrenchly/web db:generate
+        env:
+          DATABASE_URL: postgresql://placeholder:placeholder@localhost:5432/placeholder
+          DIRECT_URL: postgresql://placeholder:placeholder@localhost:5432/placeholder
 
       - name: Install Playwright browsers
         run: pnpm --filter @wrenchly/web exec playwright install --with-deps chromium
