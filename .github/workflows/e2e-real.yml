@@ -10,7 +10,35 @@ jobs:
     name: E2E Tests (real backend)
     runs-on: ubuntu-latest
     if: contains(github.event.pull_request.labels.*.name, 'e2e-real')
-    environment: test
+    # Same ephemeral-Postgres pattern as integration-tests — no external test
+    # database or secrets needed. global-setup.ts logs in as an existing user
+    # rather than signing one up itself, so "Seed E2E test user" below creates
+    # that user first.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: wrenchly_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://test:test@localhost:5432/wrenchly_test
+      DIRECT_URL: postgresql://test:test@localhost:5432/wrenchly_test
+      BETTER_AUTH_SECRET: ci-e2e-real-test-secret-32-chars-min
+      # Never actually sent — this suite doesn't exercise email-sending flows,
+      # Resend's SDK just needs a key-shaped value to construct without error.
+      RESEND_API_KEY: re_ci_fake_key_not_a_real_credential
+      CRON_SECRET: ci-e2e-real-cron-secret-32-chars-min
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      E2E_TEST_EMAIL: e2e@wrenchly.test
+      E2E_TEST_PASSWORD: TestPassword123!
     steps:
       - uses: actions/checkout@v4
 
@@ -26,30 +54,18 @@ jobs:
 
       - name: Generate Prisma client
         run: pnpm --filter @wrenchly/web db:generate
-        env:
-          DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
-          DIRECT_URL: ${{ secrets.TEST_DIRECT_URL }}
 
       - name: Run Prisma migrations
         run: pnpm --filter @wrenchly/web db:migrate
-        env:
-          DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
-          DIRECT_URL: ${{ secrets.TEST_DIRECT_URL }}
+
+      - name: Seed E2E test user
+        run: pnpm --filter @wrenchly/web db:seed:e2e
 
       - name: Install Playwright browsers
         run: pnpm --filter @wrenchly/web exec playwright install --with-deps chromium
 
       - name: Run real E2E tests
         run: pnpm --filter @wrenchly/web test:e2e
-        env:
-          DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
-          DIRECT_URL: ${{ secrets.TEST_DIRECT_URL }}
-          BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
-          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-          CRON_SECRET: ${{ secrets.CRON_SECRET }}
-          NEXT_PUBLIC_APP_URL: http://localhost:3000
-          E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
-          E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
 
       - name: Upload Playwright report
         if: failure()
