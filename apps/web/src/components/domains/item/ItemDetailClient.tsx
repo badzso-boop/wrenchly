@@ -56,7 +56,7 @@ export function ItemDetailClient({ itemId }: { itemId: string }) {
       <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3 min-w-0">
-            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" render={<Link href="/dashboard" />}>
+            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" render={<Link href="/dashboard" />} nativeButton={false}>
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <div className="min-w-0">
@@ -75,7 +75,7 @@ export function ItemDetailClient({ itemId }: { itemId: string }) {
           </div>
           <div className="flex items-center gap-1 shrink-0">
             <ShareButton itemId={itemId} />
-            <Button variant="ghost" size="sm" render={<Link href={`/items/${itemId}/edit`} />}>
+            <Button variant="ghost" size="sm" render={<Link href={`/items/${itemId}/edit`} />} nativeButton={false}>
               <Pencil className="h-4 w-4 mr-1" /> Edit
             </Button>
           </div>

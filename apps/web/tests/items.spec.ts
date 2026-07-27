@@ -21,9 +21,10 @@ test.describe('Items', () => {
 
   test('new item form validates required fields', async ({ page }) => {
     await page.goto('/items/new')
-    await page.getByRole('button', { name: /save|create|add/i }).click()
-    const nameInput = page.getByLabel(/name/i)
-    await expect(nameInput).toBeFocused()
+    const saveBtn = page.getByRole('button', { name: /save|create|add/i })
+    await expect(saveBtn).toBeDisabled()
+    await page.getByLabel(/name/i).fill('Test Item')
+    await expect(saveBtn).toBeEnabled()
   })
 
   test('can create and view a new item', async ({ page }) => {
@@ -41,9 +42,13 @@ test.describe('Items', () => {
 
   test('item detail page shows tabs', async ({ page }) => {
     await page.goto('/items')
-    const firstItem = page.locator('[href^="/items/"]').first()
-    const count = await firstItem.count()
-    if (count === 0) {
+    const firstItem = page.locator('[href^="/items/"]:not([href$="/new"])').first()
+    // The item list loads via a client-side query after navigation, so it
+    // isn't in the DOM the instant goto() resolves — wait for the real
+    // link to actually show up before concluding there isn't one.
+    try {
+      await firstItem.waitFor({ state: 'attached', timeout: 5000 })
+    } catch {
       test.skip()
       return
     }

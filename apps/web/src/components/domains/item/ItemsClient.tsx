@@ -30,7 +30,7 @@ export function ItemsClient() {
     <div className="flex flex-col h-full">
       <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6 py-4 flex items-center justify-between">
         <h1 className="text-xl font-semibold">My Items</h1>
-        <Button render={<Link href="/items/new" />} size="sm">
+        <Button render={<Link href="/items/new" />} nativeButton={false} size="sm">
           <Plus className="h-4 w-4 mr-1" /> Add Item
         </Button>
       </div>
@@ -62,7 +62,7 @@ export function ItemsClient() {
         {!items.isLoading && !items.data?.length && (
           <div className="text-center py-16">
             <p className="text-muted-foreground mb-4">No items found.</p>
-            <Button render={<Link href="/items/new" />} variant="outline">
+            <Button render={<Link href="/items/new" />} nativeButton={false} variant="outline">
               <Plus className="h-4 w-4 mr-1" /> Add Item
             </Button>
           </div>
