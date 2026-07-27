@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test'
 test.describe('Reminders', () => {
   async function getFirstItemId(page: import('@playwright/test').Page): Promise<string | null> {
     await page.goto('/items')
-    const link = page.locator('a[href^="/items/"]').filter({ hasNot: page.locator('[href$="/new"]') }).first()
+    const link = page.locator('a[href^="/items/"]:not([href$="/new"])').first()
     if (await link.count() === 0) return null
     const href = await link.getAttribute('href')
     return href?.split('/items/')[1] ?? null

@@ -43,7 +43,7 @@ test.describe('Inventory', () => {
     await page.goto('/inventory')
     await page.getByRole('button', { name: /add item/i }).click()
 
-    await page.getByLabel(/name/i).fill('Low Stock Item')
+    await page.getByLabel(/name/i).fill('E2E Sparse Widget')
     await page.getByLabel(/quantity/i).fill('1')
     await page.getByLabel(/unit/i).fill('pcs')
     await page.getByLabel(/min alert/i).fill('2')

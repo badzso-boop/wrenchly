@@ -26,7 +26,7 @@ export function DashboardClient() {
           <h1 className="text-xl font-semibold">Dashboard</h1>
           <p className="text-sm text-muted-foreground">{activeItems.length} active item{activeItems.length !== 1 ? 's' : ''}</p>
         </div>
-        <Button render={<Link href="/items/new" />} size="sm">
+        <Button render={<Link href="/items/new" />} nativeButton={false} size="sm">
           <Plus className="h-4 w-4 mr-1" /> Add Item
         </Button>
       </div>
@@ -45,7 +45,7 @@ export function DashboardClient() {
             <div className="text-5xl mb-4">🔧</div>
             <h2 className="text-lg font-semibold mb-1">No items yet</h2>
             <p className="text-muted-foreground text-sm mb-6">Add your first item to start tracking maintenance</p>
-            <Button render={<Link href="/items/new" />}>
+            <Button render={<Link href="/items/new" />} nativeButton={false}>
               <Plus className="h-4 w-4 mr-1" /> Add Your First Item
             </Button>
           </div>

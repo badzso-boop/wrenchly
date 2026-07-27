@@ -21,9 +21,10 @@ test.describe('Items', () => {
 
   test('new item form validates required fields', async ({ page }) => {
     await page.goto('/items/new')
-    await page.getByRole('button', { name: /save|create|add/i }).click()
-    const nameInput = page.getByLabel(/name/i)
-    await expect(nameInput).toBeFocused()
+    const saveBtn = page.getByRole('button', { name: /save|create|add/i })
+    await expect(saveBtn).toBeDisabled()
+    await page.getByLabel(/name/i).fill('Test Item')
+    await expect(saveBtn).toBeEnabled()
   })
 
   test('can create and view a new item', async ({ page }) => {
@@ -41,7 +42,7 @@ test.describe('Items', () => {
 
   test('item detail page shows tabs', async ({ page }) => {
     await page.goto('/items')
-    const firstItem = page.locator('[href^="/items/"]').first()
+    const firstItem = page.locator('[href^="/items/"]:not([href$="/new"])').first()
     const count = await firstItem.count()
     if (count === 0) {
       test.skip()
