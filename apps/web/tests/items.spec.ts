@@ -43,8 +43,12 @@ test.describe('Items', () => {
   test('item detail page shows tabs', async ({ page }) => {
     await page.goto('/items')
     const firstItem = page.locator('[href^="/items/"]:not([href$="/new"])').first()
-    const count = await firstItem.count()
-    if (count === 0) {
+    // The item list loads via a client-side query after navigation, so it
+    // isn't in the DOM the instant goto() resolves — wait for the real
+    // link to actually show up before concluding there isn't one.
+    try {
+      await firstItem.waitFor({ state: 'attached', timeout: 5000 })
+    } catch {
       test.skip()
       return
     }
