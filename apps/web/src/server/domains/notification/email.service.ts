@@ -107,3 +107,23 @@ export async function sendWeeklyDigestEmail(params: {
     html: `<p><strong>${subject}</strong></p><p>${intro}</p><ul>${rows}</ul><p><a href="${params.actionUrl}">View in Wrenchly</a></p>`,
   })
 }
+
+export async function sendKeyedEmail(params: {
+  to: string
+  locale: string
+  titleKey: string
+  bodyKey: string
+  bodyParams: Record<string, string | number>
+  actionUrl: string
+}): Promise<void> {
+  const t = getTranslations(params.locale)
+  const subject = t(params.titleKey)
+  const body = t(params.bodyKey, params.bodyParams)
+
+  await sendBrevoEmail({
+    to: params.to,
+    subject,
+    text: `${subject}\n\n${body}\n\n${params.actionUrl}`,
+    html: `<p><strong>${subject}</strong></p><p>${body}</p><p><a href="${params.actionUrl}">View in Wrenchly</a></p>`,
+  })
+}

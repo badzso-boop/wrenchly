@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/server/db'
 import { WeatherService } from '@/server/domains/weather/weather.service'
-import { sendPushNotifications } from '@/server/domains/notification/push.service'
+import { sendKeyedEmail } from '@/server/domains/notification/email.service'
+import { dispatchAndRecord } from '@/server/domains/notification/dispatch.service'
 import { getTranslations } from '@wrenchly/i18n'
 
 const weatherService = new WeatherService()
@@ -21,6 +22,7 @@ export async function GET(req: NextRequest) {
       user: {
         select: {
           id: true,
+          email: true,
           locale: true,
           expoPushToken: true,
           defaultLat: true,
@@ -60,31 +62,31 @@ export async function GET(req: NextRequest) {
     if (alreadySent) continue
 
     const t = getTranslations(user.locale)
-    const pref = user.notificationPref
+    const actionUrl = `/items/${reminder.itemId}`
 
-    if (user.expoPushToken && (!pref || pref.pushEnabled)) {
-      await sendPushNotifications([
-        {
-          to: user.expoPushToken,
-          title: t('notifications.weather_alert.title'),
-          body: t('notifications.weather_alert.body', { message: config.condition }),
-          data: { actionUrl: `/items/${reminder.itemId}` },
-        },
-      ])
-      triggered++
-    }
-
-    await db.smartNotification.create({
-      data: {
-        userId: user.id,
-        reminderId: reminder.id,
-        channel: 'push',
-        titleKey: 'notifications.weather_alert.title',
-        bodyKey: 'notifications.weather_alert.body',
-        bodyParams: { message: config.condition },
-        actionUrl: `/items/${reminder.itemId}`,
-      },
+    const { pushed, emailed } = await dispatchAndRecord(db, {
+      userId: user.id,
+      reminderId: reminder.id,
+      expoPushToken: user.expoPushToken,
+      pref: user.notificationPref,
+      pushTitle: t('notifications.weather_alert.title'),
+      pushBody: t('notifications.weather_alert.body', { message: config.condition }),
+      titleKey: 'notifications.weather_alert.title',
+      bodyKey: 'notifications.weather_alert.body',
+      bodyParams: { message: config.condition },
+      actionUrl,
+      sendEmail: () =>
+        sendKeyedEmail({
+          to: user.email,
+          locale: user.locale,
+          titleKey: 'notifications.weather_alert.title',
+          bodyKey: 'notifications.weather_alert.body',
+          bodyParams: { message: config.condition },
+          actionUrl,
+        }),
     })
+
+    if (pushed || emailed) triggered++
   }
 
   return NextResponse.json({ processed: weatherReminders.length, triggered })
