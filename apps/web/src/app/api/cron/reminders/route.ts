@@ -1,16 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/server/db'
-import { sendPushNotifications } from '@/server/domains/notification/push.service'
 import { sendReminderEmail } from '@/server/domains/notification/email.service'
+import { dispatchAndRecord } from '@/server/domains/notification/dispatch.service'
 import { getTranslations } from '@wrenchly/i18n'
-import { calculateNextTrigger } from '@/server/domains/reminder/reminder.service'
-
-function isInQuietHours(from: number | null, to: number | null): boolean {
-  if (from === null || to === null) return false
-  const hour = new Date().getUTCHours()
-  if (from <= to) return hour >= from && hour < to
-  return hour >= from || hour < to
-}
+import { calculateNextTriggerAfterFiring } from '@/server/domains/reminder/reminder.service'
 
 export async function GET(req: NextRequest) {
   if (req.headers.get('authorization') !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -43,54 +36,37 @@ export async function GET(req: NextRequest) {
 
   for (const reminder of dueReminders) {
     const user = reminder.user
-    const pref = user.notificationPref
     const t = getTranslations(user.locale)
+    const actionUrl = `/items/${reminder.itemId}`
 
-    if (pref && isInQuietHours(pref.quietHoursFrom, pref.quietHoursTo)) continue
-
-    // Push notification
-    if (user.expoPushToken && (!pref || pref.pushEnabled)) {
-      await sendPushNotifications([
-        {
-          to: user.expoPushToken,
-          title: t('notifications.reminder_due.title'),
-          body: t('notifications.reminder_due.body', {
-            itemName: reminder.item.name,
-            reminderTitle: reminder.title,
-          }),
-          data: { actionUrl: `/items/${reminder.itemId}` },
-        },
-      ])
-      sent++
-    }
-
-    // Email notification
-    if (pref?.emailEnabled) {
-      await sendReminderEmail({
-        to: user.email,
-        locale: user.locale,
+    const { pushed, emailed } = await dispatchAndRecord(db, {
+      userId: user.id,
+      reminderId: reminder.id,
+      expoPushToken: user.expoPushToken,
+      pref: user.notificationPref,
+      pushTitle: t('notifications.reminder_due.title'),
+      pushBody: t('notifications.reminder_due.body', {
         itemName: reminder.item.name,
         reminderTitle: reminder.title,
-        actionUrl: `/items/${reminder.itemId}`,
-      })
-    }
-
-    // Store notification record (keys, not translated text)
-    await db.smartNotification.create({
-      data: {
-        userId: user.id,
-        reminderId: reminder.id,
-        channel: 'push',
-        titleKey: 'notifications.reminder_due.title',
-        bodyKey: 'notifications.reminder_due.body',
-        bodyParams: { itemName: reminder.item.name, reminderTitle: reminder.title },
-        actionUrl: `/items/${reminder.itemId}`,
-      },
+      }),
+      titleKey: 'notifications.reminder_due.title',
+      bodyKey: 'notifications.reminder_due.body',
+      bodyParams: { itemName: reminder.item.name, reminderTitle: reminder.title },
+      actionUrl,
+      sendEmail: () =>
+        sendReminderEmail({
+          to: user.email,
+          locale: user.locale,
+          itemName: reminder.item.name,
+          reminderTitle: reminder.title,
+          actionUrl,
+        }),
     })
+    if (pushed || emailed) sent++
 
-    // Advance to next trigger
-    const nextTriggerAt = await Promise.resolve(
-      calculateNextTrigger(String(reminder.triggerType), reminder.triggerConfig as Record<string, unknown>)
+    const nextTriggerAt = await calculateNextTriggerAfterFiring(
+      String(reminder.triggerType),
+      reminder.triggerConfig as Record<string, unknown>
     )
     await db.reminder.update({
       where: { id: reminder.id },

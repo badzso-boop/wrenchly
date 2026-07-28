@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { ReminderService, calculateNextTrigger } from '@/server/domains/reminder/reminder.service'
+import {
+  ReminderService,
+  calculateNextTrigger,
+  calculateNextTriggerAfterFiring,
+} from '@/server/domains/reminder/reminder.service'
 import { TRPCError } from '@trpc/server'
 import { addDays } from 'date-fns'
 
@@ -37,6 +41,18 @@ describe('calculateNextTrigger', () => {
 
   it('INTERVAL_DAYS – returns null when days is missing', () => {
     expect(calculateNextTrigger('INTERVAL_DAYS', {})).toBeNull()
+  })
+})
+
+describe('calculateNextTriggerAfterFiring', () => {
+  it('DATE – returns null after firing, not the same fixed date again (would re-fire every cron run otherwise)', async () => {
+    const result = await calculateNextTriggerAfterFiring('DATE', { date: '2026-01-01T00:00:00.000Z' })
+    expect(result).toBeNull()
+  })
+
+  it('INTERVAL_DAYS – still recomputes the next occurrence', async () => {
+    const result = await calculateNextTriggerAfterFiring('INTERVAL_DAYS', { days: 30 })
+    expect(result).toBeInstanceOf(Date)
   })
 })
 

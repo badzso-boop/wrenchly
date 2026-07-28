@@ -44,6 +44,17 @@ export function calculateNextTrigger(
   }
 }
 
+// A DATE reminder is one-shot — recalculating from the same fixed date after it has already
+// fired would always land back in the past and re-fire on every cron run. INTERVAL_DAYS/CRON
+// are recurring, so they still recompute their next occurrence normally.
+export async function calculateNextTriggerAfterFiring(
+  triggerType: string,
+  triggerConfig: Record<string, unknown>
+): Promise<Date | null> {
+  if (triggerType === 'DATE') return null
+  return Promise.resolve(calculateNextTrigger(triggerType, triggerConfig))
+}
+
 export class ReminderService {
   constructor(private reminderRepo: ReminderRepository) {}
 
@@ -106,11 +117,9 @@ export class ReminderService {
     const reminder = await this.reminderRepo.findById(id)
     if (!reminder) return
 
-    const nextTriggerAt = await Promise.resolve(
-      calculateNextTrigger(
-        String(reminder.triggerType),
-        reminder.triggerConfig as Record<string, unknown>
-      )
+    const nextTriggerAt = await calculateNextTriggerAfterFiring(
+      String(reminder.triggerType),
+      reminder.triggerConfig as Record<string, unknown>
     )
 
     await this.reminderRepo.update(id, {
