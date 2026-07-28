@@ -79,3 +79,31 @@ export async function sendUpcomingReminderEmail(params: {
     html: `<p><strong>${subject}</strong></p><p>${body}</p><p><a href="${params.actionUrl}">View in Wrenchly</a></p>`,
   })
 }
+
+export async function sendWeeklyDigestEmail(params: {
+  to: string
+  locale: string
+  items: { itemName: string; reminderTitle: string; dueAt: Date }[]
+  actionUrl: string
+}): Promise<void> {
+  const t = getTranslations(params.locale)
+  const subject = t('notifications.weekly_digest.title')
+  const intro = t('notifications.weekly_digest.intro')
+
+  const rows = params.items
+    .map(
+      (i) =>
+        `<li><strong>${i.itemName}</strong> — ${i.reminderTitle} (${i.dueAt.toLocaleDateString(params.locale)})</li>`
+    )
+    .join('')
+  const textRows = params.items
+    .map((i) => `- ${i.itemName} — ${i.reminderTitle} (${i.dueAt.toLocaleDateString(params.locale)})`)
+    .join('\n')
+
+  await sendBrevoEmail({
+    to: params.to,
+    subject,
+    text: `${subject}\n\n${intro}\n\n${textRows}\n\n${params.actionUrl}`,
+    html: `<p><strong>${subject}</strong></p><p>${intro}</p><ul>${rows}</ul><p><a href="${params.actionUrl}">View in Wrenchly</a></p>`,
+  })
+}

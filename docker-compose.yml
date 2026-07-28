@@ -43,6 +43,8 @@ services:
       ofelia.job-exec.weather.command: "wget -qO- --header=\"Authorization: Bearer ${CRON_SECRET}\" http://localhost:3000/api/cron/weather"
       ofelia.job-exec.inventory.schedule: "0 0 7 * * *"
       ofelia.job-exec.inventory.command: "wget -qO- --header=\"Authorization: Bearer ${CRON_SECRET}\" http://localhost:3000/api/cron/inventory"
+      ofelia.job-exec.digest.schedule: "0 0 8 * * 1"
+      ofelia.job-exec.digest.command: "wget -qO- --header=\"Authorization: Bearer ${CRON_SECRET}\" http://localhost:3000/api/cron/digest"
 
   migrate:
     build:

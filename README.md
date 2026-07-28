@@ -145,8 +145,8 @@ külső Supabase/Neon/RDS projektre, bár ha mégis azt szeretnél, a `.env`-ben
    Az app a konténeren belül a 3000-es porton fut, kifelé `127.0.0.1:8086`-on érhető el.
 3. A `docker-compose.yml` egy [`ofelia`](https://github.com/mcuadros/ofelia) sidecart is indít,
    ami a Vercel `vercel.json` cron-jait váltja ki (`/api/cron/reminders` naponta 06:00,
-   `/api/cron/weather` 6 óránként, `/api/cron/inventory` naponta 07:00 UTC), `CRON_SECRET`
-   Bearer tokennel hitelesítve.
+   `/api/cron/weather` 6 óránként, `/api/cron/inventory` naponta 07:00 UTC, `/api/cron/digest`
+   hetente hétfőn 08:00 UTC), `CRON_SECRET` Bearer tokennel hitelesítve.
 4. DB migráció (első indításkor, vagy sémaváltás után) — a futó `wrenchly` konténer (Next.js
    standalone runtime) nem tartalmazza a Prisma CLI-t, ezért egy külön, a teljes builder réteget
    újrahasznosító one-off service-t kell hozzá futtatni:
