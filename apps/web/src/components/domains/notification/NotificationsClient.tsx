@@ -7,10 +7,6 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 
-function formatKey(key: string): string {
-  return key.split('.').pop()?.replace(/_/g, ' ') ?? key
-}
-
 export function NotificationsClient() {
   const notifications = api.notification.list.useQuery({ unreadOnly: false })
   const markRead = api.notification.markRead.useMutation({ onSuccess: () => notifications.refetch() })
@@ -61,8 +57,8 @@ export function NotificationsClient() {
               <CardContent className="p-4 flex items-start gap-4">
                 <div className={cn('mt-0.5 h-2 w-2 rounded-full shrink-0', n.readAt ? 'bg-transparent' : 'bg-primary')} />
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm capitalize">{formatKey(n.titleKey)}</p>
-                  <p className="text-sm text-muted-foreground capitalize">{formatKey(n.bodyKey)}</p>
+                  <p className="font-medium text-sm">{n.title}</p>
+                  <p className="text-sm text-muted-foreground">{n.body}</p>
                   <p className="text-xs text-muted-foreground mt-1">
                     {new Date(n.triggeredAt).toLocaleString()}
                   </p>

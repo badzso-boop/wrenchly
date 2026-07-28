@@ -151,14 +151,6 @@ export function SettingsClient() {
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <Label>Push notifications</Label>
-                  <p className="text-xs text-muted-foreground">Mobile app alerts</p>
-                </div>
-                <Switch checked={pushEnabled} onCheckedChange={setPushEnabled} />
-              </div>
-              <Separator />
-              <div className="flex items-center justify-between">
-                <div>
                   <Label>Email notifications</Label>
                   <p className="text-xs text-muted-foreground">Reminders via email</p>
                 </div>
