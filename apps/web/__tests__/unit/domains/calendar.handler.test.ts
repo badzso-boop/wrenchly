@@ -33,7 +33,7 @@ async function getOrCreateCalendarToken(userId: string) {
   }
   return {
     token: user.calendarToken as string,
-    feedUrl: `${BASE_URL}/api/calendar/${user.calendarToken}/feed.ics`,
+    feedUrl: `${BASE_URL}/api/calendar/${user.calendarToken}`,
   }
 }
 
@@ -42,7 +42,7 @@ async function regenerateCalendarToken(userId: string) {
   const user = await mockUserRepo.saveCalendarToken(userId, token)
   return {
     token: user.calendarToken as string,
-    feedUrl: `${BASE_URL}/api/calendar/${user.calendarToken}/feed.ics`,
+    feedUrl: `${BASE_URL}/api/calendar/${user.calendarToken}`,
   }
 }
 
@@ -58,7 +58,7 @@ describe('getOrCreateCalendarToken', () => {
     const result = await getOrCreateCalendarToken('user-1')
 
     expect(result.token).toBe(existingToken)
-    expect(result.feedUrl).toBe(`${BASE_URL}/api/calendar/${existingToken}/feed.ics`)
+    expect(result.feedUrl).toBe(`${BASE_URL}/api/calendar/${existingToken}`)
     expect(mockUserRepo.saveCalendarToken).not.toHaveBeenCalled()
   })
 
@@ -72,7 +72,7 @@ describe('getOrCreateCalendarToken', () => {
     expect(mockUserRepo.saveCalendarToken).toHaveBeenCalledOnce()
     expect(result.token).toBe(savedToken)
     expect(result.feedUrl).toContain('/api/calendar/')
-    expect(result.feedUrl.endsWith('/feed.ics')).toBe(true)
+    expect(result.feedUrl.endsWith(`/${savedToken}`)).toBe(true)
   })
 
   it('throws NOT_FOUND when user does not exist', async () => {
@@ -91,7 +91,7 @@ describe('getOrCreateCalendarToken', () => {
 
     const result = await getOrCreateCalendarToken('user-1')
 
-    expect(result.feedUrl).toBe(`${BASE_URL}/api/calendar/${token}/feed.ics`)
+    expect(result.feedUrl).toBe(`${BASE_URL}/api/calendar/${token}`)
   })
 })
 
@@ -112,7 +112,7 @@ describe('regenerateCalendarToken', () => {
 
     const result = await regenerateCalendarToken('user-1')
 
-    expect(result.feedUrl).toBe(`${BASE_URL}/api/calendar/${newToken}/feed.ics`)
+    expect(result.feedUrl).toBe(`${BASE_URL}/api/calendar/${newToken}`)
   })
 
   it('does not call findById — overwrites unconditionally', async () => {

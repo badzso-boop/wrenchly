@@ -45,7 +45,7 @@ export const userRouter = createTRPCRouter({
       user = await repo.saveCalendarToken(ctx.userId, generateCalendarToken())
     }
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://wrenchly.app'
-    return { token: user.calendarToken!, feedUrl: `${baseUrl}/api/calendar/${user.calendarToken}/feed.ics` }
+    return { token: user.calendarToken!, feedUrl: `${baseUrl}/api/calendar/${user.calendarToken}` }
   }),
 
   regenerateCalendarToken: protectedProcedure.mutation(async ({ ctx }) => {
@@ -53,7 +53,7 @@ export const userRouter = createTRPCRouter({
     const token = generateCalendarToken()
     await repo.saveCalendarToken(ctx.userId, token)
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://wrenchly.app'
-    return { token, feedUrl: `${baseUrl}/api/calendar/${token}/feed.ics` }
+    return { token, feedUrl: `${baseUrl}/api/calendar/${token}` }
   }),
 
   upsertNotifPref: protectedProcedure
