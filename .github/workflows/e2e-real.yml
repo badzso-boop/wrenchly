@@ -34,7 +34,7 @@ jobs:
       BETTER_AUTH_SECRET: ci-e2e-real-test-secret-32-chars-min
       # Never actually sent — this suite doesn't exercise email-sending flows,
       # Resend's SDK just needs a key-shaped value to construct without error.
-      RESEND_API_KEY: re_ci_fake_key_not_a_real_credential
+      BREVO_API_KEY: ci_fake_key_not_a_real_credential
       CRON_SECRET: ci-e2e-real-cron-secret-32-chars-min
       NEXT_PUBLIC_APP_URL: http://localhost:3000
       E2E_TEST_EMAIL: e2e@wrenchly.test

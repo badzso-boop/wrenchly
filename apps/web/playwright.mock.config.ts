@@ -31,7 +31,7 @@ export default defineConfig({
       DATABASE_URL: 'postgresql://localhost/mock',
       DIRECT_URL: 'postgresql://localhost/mock',
       BETTER_AUTH_SECRET: 'fake-better-auth-secret-e2e-mock-32-chars-min',
-      RESEND_API_KEY: 'fake-resend-key-e2e-mock',
+      BREVO_API_KEY: 'fake-brevo-key-e2e-mock',
       CRON_SECRET: 'fake-cron-secret-at-least-32-chars-long',
     },
   },
