@@ -55,3 +55,27 @@ export async function sendReminderEmail(params: {
     html: `<p><strong>${subject}</strong></p><p>${body}</p><p><a href="${params.actionUrl}">View in Wrenchly</a></p>`,
   })
 }
+
+export async function sendUpcomingReminderEmail(params: {
+  to: string
+  locale: string
+  itemName: string
+  reminderTitle: string
+  dueAt: Date
+  actionUrl: string
+}): Promise<void> {
+  const t = getTranslations(params.locale)
+  const subject = t('notifications.reminder_upcoming.title')
+  const body = t('notifications.reminder_upcoming.body', {
+    itemName: params.itemName,
+    reminderTitle: params.reminderTitle,
+    dueDate: params.dueAt.toLocaleDateString(params.locale),
+  })
+
+  await sendBrevoEmail({
+    to: params.to,
+    subject,
+    text: `${subject}\n\n${body}\n\n${params.actionUrl}`,
+    html: `<p><strong>${subject}</strong></p><p>${body}</p><p><a href="${params.actionUrl}">View in Wrenchly</a></p>`,
+  })
+}

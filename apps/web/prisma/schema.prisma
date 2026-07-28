@@ -228,20 +228,21 @@ model Photo {
 }
 
 model Reminder {
-  id              String      @id @default(cuid())
-  itemId          String
-  userId          String
-  title           String
-  description     String?
-  triggerType     TriggerType
-  triggerConfig   Json
-  lastTriggeredAt DateTime?
-  nextTriggerAt   DateTime?
-  isActive        Boolean     @default(true)
-  notifyChannels  String[]    @default(["push"])
-  snoozeUntil     DateTime?
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  id                String      @id @default(cuid())
+  itemId            String
+  userId            String
+  title             String
+  description       String?
+  triggerType       TriggerType
+  triggerConfig     Json
+  lastTriggeredAt   DateTime?
+  nextTriggerAt     DateTime?
+  advanceNotifiedAt DateTime?
+  isActive          Boolean     @default(true)
+  notifyChannels    String[]    @default(["push"])
+  snoozeUntil       DateTime?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
 
   user          User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   item          Item                @relation(fields: [itemId], references: [id], onDelete: Cascade)
@@ -263,10 +264,10 @@ enum TriggerType {
 }
 
 model SmartNotification {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   userId       String
   reminderId   String?
-  triggeredAt  DateTime @default(now())
+  triggeredAt  DateTime  @default(now())
   channel      String
   titleKey     String
   bodyKey      String
@@ -362,7 +363,7 @@ enum ShoppingStatus {
 // ─── DOMAIN PROFILOK ─────────────────────────────────────────────────────────
 
 model VehicleProfile {
-  itemId             String   @id
+  itemId             String    @id
   make               String
   model              String
   year               Int?
@@ -380,8 +381,8 @@ model VehicleProfile {
   brakeFluidType     String?
   tireSizeFront      String?
   tireSizeRear       String?
-  tirePressureFront  Decimal? @db.Decimal(4, 2)
-  tirePressureRear   Decimal? @db.Decimal(4, 2)
+  tirePressureFront  Decimal?  @db.Decimal(4, 2)
+  tirePressureRear   Decimal?  @db.Decimal(4, 2)
   currentOdometer    Int?
   lastOdometerUpdate DateTime?
 
@@ -434,18 +435,18 @@ model PlantProfile {
 }
 
 model Printer3dProfile {
-  itemId           String   @id
-  brand            String
-  model            String
-  buildVolumeX     Int?
-  buildVolumeY     Int?
-  buildVolumeZ     Int?
-  nozzleDiameter   Decimal? @db.Decimal(3, 2)
-  defaultNozzleMat String?
-  firmwareVersion  String?
-  totalPrintHours  Decimal? @default(0) @db.Decimal(8, 2)
-  totalPrints      Int?     @default(0)
-  filamentConsumedG Int?    @default(0)
+  itemId            String   @id
+  brand             String
+  model             String
+  buildVolumeX      Int?
+  buildVolumeY      Int?
+  buildVolumeZ      Int?
+  nozzleDiameter    Decimal? @db.Decimal(3, 2)
+  defaultNozzleMat  String?
+  firmwareVersion   String?
+  totalPrintHours   Decimal? @default(0) @db.Decimal(8, 2)
+  totalPrints       Int?     @default(0)
+  filamentConsumedG Int?     @default(0)
 
   item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
 
@@ -487,7 +488,7 @@ model BicycleProfile {
 }
 
 model AquariumProfile {
-  itemId       String   @id
+  itemId       String    @id
   aquariumType String
   volumeLiters Int?
   dimensions   String?
@@ -495,9 +496,9 @@ model AquariumProfile {
   substrate    String?
   lighting     String?
   filtration   String?
-  co2System    Boolean  @default(false)
+  co2System    Boolean   @default(false)
   heaterBrand  String?
-  targetTempC  Decimal? @db.Decimal(4, 1)
+  targetTempC  Decimal?  @db.Decimal(4, 1)
 
   item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
 
