@@ -69,7 +69,7 @@ mutathat — self-hosted konténerre, Neon-ra, RDS-re, vagy akár Supabase-nek *
 
 | Szolgáltatás | Mire | Env var(ok) |
 |---|---|---|
-| **Resend** | Tranzakciós email (emlékeztetők, stb.) — `src/server/domains/notification/email.service.ts` | `RESEND_API_KEY` |
+| **Brevo** | Tranzakciós email (emlékeztetők, stb.) — `src/server/domains/notification/email.service.ts`, domain szinten hitelesítve (`ujjweb.hu`, ugyanaz a fiók mint az ujjweb2.0 kontakt űrlapja) | `BREVO_API_KEY` |
 | **Expo Push** (`expo-server-sdk`) | Mobil push értesítések — `src/server/domains/notification/push.service.ts`. Nem igényel saját API-kulcsot, a felhasználó Expo push tokenjét használja. | – |
 | **Open-Meteo** (`api.open-meteo.com`) | Ingyenes, kulcs nélküli időjárás API a smart notification triggerekhez — `src/server/domains/weather/weather.service.ts` | – |
 
@@ -134,7 +134,7 @@ külső Supabase/Neon/RDS projektre, bár ha mégis azt szeretnél, a `.env`-ben
 `DATABASE_URL`/`DIRECT_URL` (ld. `docker-compose.yml` a pontos fallback-logikáért).
 
 1. Hozz létre egy `.env` fájlt a repó gyökerében (**nem** `apps/web/` alatt — a `docker-compose.yml`
-   onnan olvassa) az `apps/web/.env.example` alapján, valós `BETTER_AUTH_SECRET`/Resend
+   onnan olvassa) az `apps/web/.env.example` alapján, valós `BETTER_AUTH_SECRET`/Brevo
    kulcsokkal.
 2. Build + indítás:
 
