@@ -8,6 +8,10 @@
       "title": "Overdue Maintenance",
       "body": "{{itemName}}: {{reminderTitle}} is overdue"
     },
+    "reminder_upcoming": {
+      "title": "Upcoming Maintenance",
+      "body": "{{itemName}}: {{reminderTitle}} is due on {{dueDate}}"
+    },
     "low_stock": {
       "title": "Low Stock",
       "body": "{{itemName}} is running low"
@@ -15,6 +19,11 @@
     "weather_alert": {
       "title": "Weather Alert",
       "body": "{{message}}"
+    },
+    "weekly_digest": {
+      "title": "Your weekly maintenance digest",
+      "intro": "Here's what's coming up this week:",
+      "body": "{{count}} maintenance item(s) due this week"
     }
   }
 }

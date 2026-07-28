@@ -8,6 +8,10 @@
       "title": "Lejárt karbantartás",
       "body": "{{itemName}}: {{reminderTitle}} már lejárt"
     },
+    "reminder_upcoming": {
+      "title": "Közelgő karbantartás",
+      "body": "{{itemName}}: {{reminderTitle}} esedékes {{dueDate}}-n"
+    },
     "low_stock": {
       "title": "Alacsony készlet",
       "body": "{{itemName}} hamarosan elfogy"
@@ -15,6 +19,11 @@
     "weather_alert": {
       "title": "Időjárás figyelmeztetés",
       "body": "{{message}}"
+    },
+    "weekly_digest": {
+      "title": "Heti karbantartási összefoglaló",
+      "intro": "Ezek jönnek a héten:",
+      "body": "{{count}} karbantartás esedékes a héten"
     }
   }
 }

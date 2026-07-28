@@ -22,10 +22,10 @@ function getNestedValue(obj: Record<string, unknown>, key: string): string | und
   return typeof current === 'string' ? current : undefined
 }
 
-function interpolate(template: string, params?: Record<string, string>): string {
+function interpolate(template: string, params?: Record<string, string | number>): string {
   if (!params) return template
   return Object.entries(params).reduce(
-    (str, [key, val]) => str.replace(new RegExp(`{{${key}}}`, 'g'), val),
+    (str, [key, val]) => str.replace(new RegExp(`{{${key}}}`, 'g'), String(val)),
     template
   )
 }
@@ -34,7 +34,7 @@ export function getTranslations(locale: string) {
   const lang = (locale in translations ? locale : 'en') as SupportedLocale
   const dict = translations[lang] as Record<string, unknown>
 
-  return function t(key: string, params?: Record<string, string>): string {
+  return function t(key: string, params?: Record<string, string | number>): string {
     const value = getNestedValue(dict, key)
     if (!value) return key
     return interpolate(value, params)
