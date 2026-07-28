@@ -1,7 +1,10 @@
 import { TRPCError } from '@trpc/server'
 import { addDays } from 'date-fns'
 import { type ReminderRepository } from './reminder.repository'
-import { type Reminder } from '@prisma/client'
+import { type Reminder, type PrismaClient } from '@prisma/client'
+import { getTranslations } from '@wrenchly/i18n'
+import { dispatchAndRecord } from '@/server/domains/notification/dispatch.service'
+import { sendReminderEmail } from '@/server/domains/notification/email.service'
 
 // Lazy import to avoid issues in test environment
 async function parseCron(expression: string): Promise<Date | null> {
@@ -147,5 +150,63 @@ export class ReminderService {
     }
 
     return triggered
+  }
+
+  async dispatchOdometerTriggers(
+    db: PrismaClient,
+    itemId: string,
+    itemName: string,
+    currentKm: number
+  ): Promise<number> {
+    const reminders = await this.reminderRepo.findOdometerByItemIdWithUser(itemId)
+    let notified = 0
+
+    for (const reminder of reminders) {
+      const config = reminder.triggerConfig as Record<string, unknown>
+      const everyKm = config['every_km']
+      const lastDoneAtKm = config['last_done_at_km']
+      if (typeof everyKm !== 'number') continue
+
+      const base = typeof lastDoneAtKm === 'number' ? lastDoneAtKm : 0
+      const nextKm = base + everyKm
+      if (currentKm < nextKm) continue
+
+      const user = reminder.user
+      const t = getTranslations(user.locale)
+      const actionUrl = `/items/${itemId}`
+
+      const { pushed, emailed } = await dispatchAndRecord(db, {
+        userId: user.id,
+        reminderId: reminder.id,
+        expoPushToken: user.expoPushToken,
+        pref: user.notificationPref,
+        pushTitle: t('notifications.reminder_due.title'),
+        pushBody: t('notifications.reminder_due.body', {
+          itemName,
+          reminderTitle: reminder.title,
+        }),
+        titleKey: 'notifications.reminder_due.title',
+        bodyKey: 'notifications.reminder_due.body',
+        bodyParams: { itemName, reminderTitle: reminder.title },
+        actionUrl,
+        sendEmail: () =>
+          sendReminderEmail({
+            to: user.email,
+            locale: user.locale,
+            itemName,
+            reminderTitle: reminder.title,
+            actionUrl,
+          }),
+      })
+
+      if (pushed || emailed) notified++
+
+      await this.reminderRepo.update(reminder.id, {
+        lastTriggeredAt: new Date(),
+        triggerConfig: { ...config, last_done_at_km: currentKm },
+      })
+    }
+
+    return notified
   }
 }

@@ -3,6 +3,7 @@ import { createTRPCRouter, protectedProcedure } from '@/server/trpc'
 import { VehicleRepository } from './vehicle.repository'
 import { VehicleService } from './vehicle.service'
 import { ItemRepository } from '@/server/domains/item/item.repository'
+import { ReminderRepository } from '@/server/domains/reminder/reminder.repository'
 
 export const vehicleRouter = createTRPCRouter({
   getByItemId: protectedProcedure
@@ -10,7 +11,8 @@ export const vehicleRouter = createTRPCRouter({
     .query(({ ctx, input }) => {
       const vehicleRepo = new VehicleRepository(ctx.db)
       const itemRepo = new ItemRepository(ctx.db)
-      const service = new VehicleService(vehicleRepo, itemRepo)
+      const reminderRepo = new ReminderRepository(ctx.db)
+      const service = new VehicleService(vehicleRepo, itemRepo, reminderRepo, ctx.db)
       return service.getByItemId(input.itemId, ctx.userId)
     }),
 
@@ -32,7 +34,8 @@ export const vehicleRouter = createTRPCRouter({
     .mutation(({ ctx, input }) => {
       const vehicleRepo = new VehicleRepository(ctx.db)
       const itemRepo = new ItemRepository(ctx.db)
-      const service = new VehicleService(vehicleRepo, itemRepo)
+      const reminderRepo = new ReminderRepository(ctx.db)
+      const service = new VehicleService(vehicleRepo, itemRepo, reminderRepo, ctx.db)
       return service.create(ctx.userId, input)
     }),
 
@@ -54,7 +57,8 @@ export const vehicleRouter = createTRPCRouter({
       const { itemId, ...data } = input
       const vehicleRepo = new VehicleRepository(ctx.db)
       const itemRepo = new ItemRepository(ctx.db)
-      const service = new VehicleService(vehicleRepo, itemRepo)
+      const reminderRepo = new ReminderRepository(ctx.db)
+      const service = new VehicleService(vehicleRepo, itemRepo, reminderRepo, ctx.db)
       return service.update(itemId, ctx.userId, data)
     }),
 
@@ -68,7 +72,8 @@ export const vehicleRouter = createTRPCRouter({
     .mutation(({ ctx, input }) => {
       const vehicleRepo = new VehicleRepository(ctx.db)
       const itemRepo = new ItemRepository(ctx.db)
-      const service = new VehicleService(vehicleRepo, itemRepo)
+      const reminderRepo = new ReminderRepository(ctx.db)
+      const service = new VehicleService(vehicleRepo, itemRepo, reminderRepo, ctx.db)
       return service.updateOdometer(input.itemId, ctx.userId, input.odometer)
     }),
 })

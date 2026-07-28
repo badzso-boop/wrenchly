@@ -19,9 +19,24 @@ const mockItemRepo = {
   delete: vi.fn(),
 }
 
-const service = new VehicleService(mockVehicleRepo as any, mockItemRepo as any)
+const mockReminderRepo = {
+  findOdometerByItemIdWithUser: vi.fn(),
+  update: vi.fn(),
+}
 
-beforeEach(() => vi.clearAllMocks())
+const mockDb = {}
+
+const service = new VehicleService(
+  mockVehicleRepo as any,
+  mockItemRepo as any,
+  mockReminderRepo as any,
+  mockDb as any
+)
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  mockReminderRepo.findOdometerByItemIdWithUser.mockResolvedValue([])
+})
 
 describe('VehicleService.updateOdometer', () => {
   it('updates odometer when new value is greater', async () => {

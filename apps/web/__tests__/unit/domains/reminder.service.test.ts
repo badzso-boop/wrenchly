@@ -7,6 +7,16 @@ import {
 import { TRPCError } from '@trpc/server'
 import { addDays } from 'date-fns'
 
+vi.mock('@/server/domains/notification/push.service', () => ({
+  sendPushNotifications: vi.fn(),
+}))
+vi.mock('@/server/domains/notification/email.service', () => ({
+  sendReminderEmail: vi.fn(),
+}))
+
+import { sendPushNotifications } from '@/server/domains/notification/push.service'
+import { sendReminderEmail } from '@/server/domains/notification/email.service'
+
 // ─── calculateNextTrigger unit tests ───────────────────────────────────────
 
 describe('calculateNextTrigger', () => {
@@ -64,9 +74,14 @@ const mockReminderRepo = {
   findByItemId: vi.fn(),
   findDue: vi.fn(),
   findOdometerByItemId: vi.fn(),
+  findOdometerByItemIdWithUser: vi.fn(),
   create: vi.fn(),
   update: vi.fn(),
   delete: vi.fn(),
+}
+
+const mockDb = {
+  smartNotification: { create: vi.fn() },
 }
 
 const service = new ReminderService(mockReminderRepo as any)
@@ -152,6 +167,70 @@ describe('ReminderService.evaluateOdometerTriggers', () => {
 
     const triggered = await service.evaluateOdometerTriggers('item-1', 55000)
     expect(triggered).toHaveLength(0)
+  })
+})
+
+describe('ReminderService.dispatchOdometerTriggers', () => {
+  const user = {
+    id: 'user-1',
+    email: 'user@example.com',
+    locale: 'en',
+    expoPushToken: 'ExponentPushToken[abc]',
+    notificationPref: { pushEnabled: true, emailEnabled: true, quietHoursFrom: null, quietHoursTo: null },
+  }
+
+  it('notifies and advances last_done_at_km when threshold is reached', async () => {
+    mockReminderRepo.findOdometerByItemIdWithUser.mockResolvedValue([
+      {
+        id: 'r-1',
+        title: 'Oil change',
+        triggerConfig: { every_km: 10000, last_done_at_km: 45000 },
+        user,
+      },
+    ])
+    mockReminderRepo.update.mockResolvedValue({})
+
+    const notified = await service.dispatchOdometerTriggers(mockDb as any, 'item-1', 'My Car', 55000)
+
+    expect(notified).toBe(1)
+    expect(sendPushNotifications).toHaveBeenCalledTimes(1)
+    expect(sendReminderEmail).toHaveBeenCalledTimes(1)
+    expect(mockReminderRepo.update).toHaveBeenCalledWith(
+      'r-1',
+      expect.objectContaining({ triggerConfig: expect.objectContaining({ last_done_at_km: 55000 }) })
+    )
+    expect(mockDb.smartNotification.create).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not notify when threshold is not reached', async () => {
+    mockReminderRepo.findOdometerByItemIdWithUser.mockResolvedValue([
+      { id: 'r-1', title: 'Oil change', triggerConfig: { every_km: 10000, last_done_at_km: 50000 }, user },
+    ])
+
+    const notified = await service.dispatchOdometerTriggers(mockDb as any, 'item-1', 'My Car', 55000)
+
+    expect(notified).toBe(0)
+    expect(sendPushNotifications).not.toHaveBeenCalled()
+    expect(sendReminderEmail).not.toHaveBeenCalled()
+    expect(mockReminderRepo.update).not.toHaveBeenCalled()
+  })
+
+  it('respects quiet hours (no push/email/record when inside window)', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-07-28T14:00:00.000Z')) // hour 14 UTC
+
+    const quietUser = { ...user, notificationPref: { ...user.notificationPref, quietHoursFrom: 13, quietHoursTo: 15 } }
+    mockReminderRepo.findOdometerByItemIdWithUser.mockResolvedValue([
+      { id: 'r-1', title: 'Oil change', triggerConfig: { every_km: 10000, last_done_at_km: 45000 }, user: quietUser },
+    ])
+
+    const notified = await service.dispatchOdometerTriggers(mockDb as any, 'item-1', 'My Car', 55000)
+
+    vi.useRealTimers()
+
+    expect(notified).toBe(0)
+    expect(sendPushNotifications).not.toHaveBeenCalled()
+    expect(sendReminderEmail).not.toHaveBeenCalled()
   })
 })
 

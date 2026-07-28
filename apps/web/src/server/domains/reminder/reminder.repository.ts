@@ -44,6 +44,23 @@ export class ReminderRepository {
     })
   }
 
+  async findOdometerByItemIdWithUser(itemId: string) {
+    return this.db.reminder.findMany({
+      where: { itemId, isActive: true, triggerType: 'ODOMETER' },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            locale: true,
+            expoPushToken: true,
+            notificationPref: true,
+          },
+        },
+      },
+    })
+  }
+
   async create(data: {
     userId: string
     itemId: string

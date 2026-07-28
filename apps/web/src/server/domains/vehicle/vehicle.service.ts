@@ -1,14 +1,18 @@
 import { TRPCError } from '@trpc/server'
 import { type VehicleRepository } from './vehicle.repository'
 import { type ItemRepository } from '@/server/domains/item/item.repository'
-import { type VehicleProfile } from '@prisma/client'
+import { ReminderService } from '@/server/domains/reminder/reminder.service'
+import { type ReminderRepository } from '@/server/domains/reminder/reminder.repository'
+import { type PrismaClient, type VehicleProfile } from '@prisma/client'
 
 const VIN_REGEX = /^[A-HJ-NPR-Z0-9]{17}$/
 
 export class VehicleService {
   constructor(
     private vehicleRepo: VehicleRepository,
-    private itemRepo: ItemRepository
+    private itemRepo: ItemRepository,
+    private reminderRepo: ReminderRepository,
+    private db: PrismaClient
   ) {}
 
   async getByItemId(itemId: string, userId: string): Promise<VehicleProfile> {
@@ -70,7 +74,8 @@ export class VehicleService {
   }
 
   async updateOdometer(itemId: string, userId: string, newKm: number): Promise<VehicleProfile> {
-    await this.assertItemOwnership(itemId, userId)
+    const item = await this.itemRepo.findByIdAndUserId(itemId, userId)
+    if (!item) throw new TRPCError({ code: 'NOT_FOUND', message: 'errors.item.not_found' })
 
     const profile = await this.vehicleRepo.findByItemId(itemId)
     if (!profile) throw new TRPCError({ code: 'NOT_FOUND', message: 'errors.vehicle.not_found' })
@@ -82,7 +87,12 @@ export class VehicleService {
       })
     }
 
-    return this.vehicleRepo.updateOdometer(itemId, newKm)
+    const updated = await this.vehicleRepo.updateOdometer(itemId, newKm)
+
+    const reminderService = new ReminderService(this.reminderRepo)
+    await reminderService.dispatchOdometerTriggers(this.db, itemId, item.name, newKm)
+
+    return updated
   }
 
   private async assertItemOwnership(itemId: string, userId: string): Promise<void> {
