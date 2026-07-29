@@ -37,10 +37,11 @@ export const reminderRouter = createTRPCRouter({
         triggerConfig: TriggerConfigSchema,
       })
     )
-    .mutation(({ ctx, input }) => {
+    .mutation(async ({ ctx, input }) => {
       const repo = new ReminderRepository(ctx.db)
       const service = new ReminderService(repo)
-      return service.create(ctx.userId, input)
+      const user = await ctx.db.user.findUniqueOrThrow({ where: { id: ctx.userId }, select: { timezone: true } })
+      return service.create(ctx.userId, input, user.timezone)
     }),
 
   update: protectedProcedure
@@ -53,11 +54,12 @@ export const reminderRouter = createTRPCRouter({
         triggerConfig: TriggerConfigSchema.optional(),
       })
     )
-    .mutation(({ ctx, input }) => {
+    .mutation(async ({ ctx, input }) => {
       const { id, ...data } = input
       const repo = new ReminderRepository(ctx.db)
       const service = new ReminderService(repo)
-      return service.update(id, ctx.userId, data)
+      const user = await ctx.db.user.findUniqueOrThrow({ where: { id: ctx.userId }, select: { timezone: true } })
+      return service.update(id, ctx.userId, data, user.timezone)
     }),
 
   delete: protectedProcedure

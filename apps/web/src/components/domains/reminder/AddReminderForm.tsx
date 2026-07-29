@@ -21,6 +21,7 @@ export function AddReminderForm({ itemId, onSuccess }: { itemId: string; onSucce
   const [title, setTitle] = useState('')
   const [triggerType, setTriggerType] = useState<TriggerType>('INTERVAL_DAYS')
   const [date, setDate] = useState('')
+  const [time, setTime] = useState('')
   const [days, setDays] = useState('30')
   const [odometerThreshold, setOdometerThreshold] = useState('')
   const [cronExpr, setCronExpr] = useState('0 9 1 * *')
@@ -33,7 +34,7 @@ export function AddReminderForm({ itemId, onSuccess }: { itemId: string; onSucce
 
   function buildConfig(): Record<string, unknown> {
     switch (triggerType) {
-      case 'DATE': return { date }
+      case 'DATE': return time ? { date, time } : { date }
       case 'INTERVAL_DAYS': return { days: Number(days) }
       case 'ODOMETER': return { threshold: Number(odometerThreshold) }
       case 'CRON': return { expression: cronExpr }
@@ -71,9 +72,16 @@ export function AddReminderForm({ itemId, onSuccess }: { itemId: string; onSucce
           </div>
 
           {triggerType === 'DATE' && (
-            <div className="space-y-2">
-              <Label htmlFor="date">Date *</Label>
-              <Input id="date" type="date" value={date} onChange={(e) => setDate((e.target as HTMLInputElement).value)} required />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="date">Date *</Label>
+                <Input id="date" type="date" value={date} onChange={(e) => setDate((e.target as HTMLInputElement).value)} required />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="time">Time</Label>
+                <Input id="time" type="time" value={time} onChange={(e) => setTime((e.target as HTMLInputElement).value)} />
+                <p className="text-xs text-muted-foreground">Only affects the calendar event — email/push still goes out on the daily check.</p>
+              </div>
             </div>
           )}
 

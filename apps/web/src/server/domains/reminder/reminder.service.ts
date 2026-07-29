@@ -1,5 +1,6 @@
 import { TRPCError } from '@trpc/server'
 import { addDays } from 'date-fns'
+import { fromZonedTime } from 'date-fns-tz'
 import { type ReminderRepository } from './reminder.repository'
 import { type Reminder, type PrismaClient } from '@prisma/client'
 import { getTranslations } from '@wrenchly/i18n'
@@ -19,13 +20,21 @@ async function parseCron(expression: string): Promise<Date | null> {
 
 export function calculateNextTrigger(
   triggerType: string,
-  triggerConfig: Record<string, unknown>
+  triggerConfig: Record<string, unknown>,
+  timezone = 'UTC'
 ): Promise<Date | null> | Date | null {
   switch (triggerType) {
     case 'DATE': {
       const date = triggerConfig['date']
-      if (typeof date === 'string') return new Date(date)
-      return null
+      if (typeof date !== 'string') return null
+      // Optional time-of-day: lets the calendar (.ics) event land on the exact
+      // moment the user picked, in their own timezone — independent of the
+      // once-daily email/push cron, which still only checks nextTriggerAt <= now.
+      const time = triggerConfig['time']
+      if (typeof time === 'string' && /^\d{2}:\d{2}$/.test(time)) {
+        return fromZonedTime(`${date}T${time}:00`, timezone)
+      }
+      return new Date(date)
     }
     case 'INTERVAL_DAYS': {
       const days = triggerConfig['days']
@@ -82,10 +91,11 @@ export class ReminderService {
       title: string
       triggerType: string
       triggerConfig: Record<string, unknown>
-    }
+    },
+    timezone = 'UTC'
   ): Promise<Reminder> {
     const nextTriggerAt = await Promise.resolve(
-      calculateNextTrigger(input.triggerType, input.triggerConfig)
+      calculateNextTrigger(input.triggerType, input.triggerConfig, timezone)
     )
     return this.reminderRepo.create({ userId, ...input, nextTriggerAt })
   }
@@ -98,14 +108,15 @@ export class ReminderService {
       isActive?: boolean
       triggerType?: string
       triggerConfig?: Record<string, unknown>
-    }
+    },
+    timezone = 'UTC'
   ): Promise<Reminder> {
     const reminder = await this.reminderRepo.findByIdAndUserId(id, userId)
     if (!reminder) throw new TRPCError({ code: 'NOT_FOUND', message: 'errors.reminder.not_found' })
 
     const type = input.triggerType ?? String(reminder.triggerType)
     const config = input.triggerConfig ?? (reminder.triggerConfig as Record<string, unknown>)
-    const nextTriggerAt = await Promise.resolve(calculateNextTrigger(type, config))
+    const nextTriggerAt = await Promise.resolve(calculateNextTrigger(type, config, timezone))
 
     return this.reminderRepo.update(id, { ...input, nextTriggerAt })
   }
