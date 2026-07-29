@@ -1,5 +1,6 @@
 import ical, { ICalCalendarMethod, ICalAlarmType } from 'ical-generator'
 import { addDays } from 'date-fns'
+import { toZonedTime } from 'date-fns-tz'
 import type { Reminder, Item } from '@prisma/client'
 
 type ReminderWithItem = Reminder & { item: Item }
@@ -56,7 +57,12 @@ export function generateIcs(reminders: ReminderWithItem[], userTimezone: string)
 
     const summary = `${reminder.item.name} — ${reminder.title}`
     const description = buildDescription(reminder)
-    const start = reminder.nextTriggerAt
+    // ical-generator's per-event `timezone` option expects the Date's own clock digits
+    // to already be the wall-clock time in that zone (it labels, it doesn't convert) —
+    // so nextTriggerAt (a real UTC instant) must be pre-converted here, or the feed shows
+    // the raw UTC clock time mislabeled with the user's TZID (e.g. 12:30 UTC rendered as
+    // "12:30 Europe/Budapest" instead of the correct 14:30).
+    const start = toZonedTime(reminder.nextTriggerAt, userTimezone)
 
     // Primary event
     const event = calendar.createEvent({
@@ -75,7 +81,8 @@ export function generateIcs(reminders: ReminderWithItem[], userTimezone: string)
     })
 
     // Future occurrences for recurring reminders
-    for (const [i, date] of futureOccurrences(reminder).entries()) {
+    for (const [i, rawDate] of futureOccurrences(reminder).entries()) {
+      const date = toZonedTime(rawDate, userTimezone)
       const future = calendar.createEvent({
         id: `${reminder.id}-${i + 1}@wrenchly.app`,
         summary,
