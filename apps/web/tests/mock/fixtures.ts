@@ -112,6 +112,12 @@ export const TEST_NOTIFICATIONS = [
     reminderId: 'mock-rem-1',
     titleKey: 'Oil Change Due',
     bodyKey: 'Toyota Corolla oil change is due',
+    // The real notification.list handler spreads the stored row and adds these
+    // translated fields (title = t(titleKey), body = t(bodyKey, bodyParams)) —
+    // the mock bypasses real translation, so it must supply them directly or
+    // NotificationsClient (which renders n.title / n.body) shows nothing.
+    title: 'Oil Change Due',
+    body: 'Toyota Corolla oil change is due',
     bodyParams: null,
     channel: 'push',
     actionUrl: null,
