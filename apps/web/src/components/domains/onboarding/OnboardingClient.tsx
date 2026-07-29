@@ -2,8 +2,12 @@
 import { api } from '@/lib/trpc/client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Wrench } from 'lucide-react'
+import { Wrench, Copy, Check, Calendar } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
+import { Separator } from '@/components/ui/separator'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
 const HOBBIES: { value: string; label: string }[] = [
@@ -24,11 +28,17 @@ const HOBBIES: { value: string; label: string }[] = [
 export function OnboardingClient() {
   const router = useRouter()
   const state = api.onboarding.getState.useQuery()
-  const [step, setStep] = useState<'hobbies' | 'confirm'>('hobbies')
+  const [step, setStep] = useState<'hobbies' | 'notifications' | 'confirm'>('hobbies')
   const [selected, setSelected] = useState<string[]>([])
+
+  const [emailEnabled, setEmailEnabled] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const calendarToken = api.user.getOrCreateCalendarToken.useQuery()
+  const upsertPref = api.user.upsertNotifPref.useMutation()
 
   useEffect(() => {
     if (state.data?.selectedHobbies?.length) setSelected(state.data.selectedHobbies)
+    if (state.data?.currentStep === 'notifications') setStep('notifications')
     if (state.data?.currentStep === 'confirm') setStep('confirm')
   }, [state.data])
 
@@ -44,8 +54,21 @@ export function OnboardingClient() {
   }
 
   function handleContinue() {
+    updateStep.mutate({ currentStep: 'notifications', selectedHobbies: selected })
+    setStep('notifications')
+  }
+
+  function handleNotificationsContinue() {
+    upsertPref.mutate({ emailEnabled })
     updateStep.mutate({ currentStep: 'confirm', selectedHobbies: selected })
     setStep('confirm')
+  }
+
+  function copyFeedUrl() {
+    if (!calendarToken.data?.feedUrl) return
+    navigator.clipboard.writeText(calendarToken.data.feedUrl)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
   }
 
   return (
@@ -88,6 +111,57 @@ export function OnboardingClient() {
           </Card>
         )}
 
+        {step === 'notifications' && (
+          <Card className="shadow-xl">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-xl">Stay on top of it</CardTitle>
+              <CardDescription>
+                Turn on email, subscribe to the calendar, or both — pick whatever fits you. You can always change this later in Settings.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>Email notifications</Label>
+                  <p className="text-xs text-muted-foreground">Reminders via email</p>
+                </div>
+                <Switch checked={emailEnabled} onCheckedChange={setEmailEnabled} />
+              </div>
+
+              <Separator />
+
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4" /> Calendar Integration
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Subscribe to your reminders in Google Calendar, Apple Calendar, or Outlook
+                </p>
+                {calendarToken.isLoading ? (
+                  <div className="h-9 rounded-md bg-muted animate-pulse" />
+                ) : (
+                  <div className="flex gap-2">
+                    <Input
+                      readOnly
+                      value={calendarToken.data?.feedUrl ?? ''}
+                      className="font-mono text-xs bg-muted"
+                    />
+                    <Button variant="outline" size="icon" onClick={copyFeedUrl} aria-label="Copy URL">
+                      {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {upsertPref.error && <p className="text-sm text-destructive">{upsertPref.error.message}</p>}
+              <Button className="w-full" disabled={updateStep.isPending || upsertPref.isPending} onClick={handleNotificationsContinue}>
+                Continue
+              </Button>
+              <Button variant="ghost" className="w-full" onClick={() => setStep('hobbies')}>Back</Button>
+            </CardContent>
+          </Card>
+        )}
+
         {step === 'confirm' && (
           <Card className="shadow-xl">
             <CardHeader className="pb-4">
@@ -107,7 +181,7 @@ export function OnboardingClient() {
               >
                 {complete.isPending ? 'Finishing…' : 'Get started'}
               </Button>
-              <Button variant="ghost" className="w-full" onClick={() => setStep('hobbies')}>Back</Button>
+              <Button variant="ghost" className="w-full" onClick={() => setStep('notifications')}>Back</Button>
             </CardContent>
           </Card>
         )}
