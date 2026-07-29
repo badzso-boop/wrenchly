@@ -9,15 +9,28 @@ import type { MaintenanceRecord, Part } from '@prisma/client'
 
 type RecordWithParts = MaintenanceRecord & { parts: Part[] }
 
-const CATEGORY_COLORS: Record<string, string> = {
-  OIL_CHANGE: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-  FILTER: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-  BRAKES: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-  TYRES: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
-  ELECTRICAL: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
-  INSPECTION: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-  REPAIR: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
-  OTHER: 'bg-muted text-muted-foreground',
+// The full per-item-type category list (see maintenance.categories.ts) is much larger
+// than a handful of vehicle terms, so colors are assigned deterministically by hashing
+// the category value into a fixed palette instead of hand-maintaining one entry per key.
+const CATEGORY_PALETTE = [
+  'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+  'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+  'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+  'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
+  'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
+  'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+  'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
+  'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400',
+  'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400',
+  'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400',
+]
+const OTHER_COLOR = 'bg-muted text-muted-foreground'
+
+function categoryColor(category: string): string {
+  if (category === 'OTHER') return OTHER_COLOR
+  let hash = 0
+  for (let i = 0; i < category.length; i++) hash = (hash * 31 + category.charCodeAt(i)) | 0
+  return CATEGORY_PALETTE[Math.abs(hash) % CATEGORY_PALETTE.length] ?? OTHER_COLOR
 }
 
 export function MaintenanceList({ records }: { records: RecordWithParts[] }) {
@@ -38,7 +51,7 @@ export function MaintenanceList({ records }: { records: RecordWithParts[] }) {
     <div className="space-y-2">
       {records.map((record) => {
         const isExpanded = expanded === record.id
-        const colorClass = CATEGORY_COLORS[record.category] ?? CATEGORY_COLORS.OTHER
+        const colorClass = categoryColor(record.category)
 
         return (
           <Card key={record.id} className="transition-all duration-200 hover:shadow-sm">

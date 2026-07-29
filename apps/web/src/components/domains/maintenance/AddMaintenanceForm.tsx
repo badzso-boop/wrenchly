@@ -9,17 +9,8 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-
-const CATEGORIES = [
-  { value: 'OIL_CHANGE', label: 'Oil Change' },
-  { value: 'FILTER', label: 'Filter' },
-  { value: 'BRAKES', label: 'Brakes' },
-  { value: 'TYRES', label: 'Tyres' },
-  { value: 'ELECTRICAL', label: 'Electrical' },
-  { value: 'INSPECTION', label: 'Inspection' },
-  { value: 'REPAIR', label: 'Repair' },
-  { value: 'OTHER', label: 'Other' },
-]
+import { getMaintenanceCategories } from '@/server/domains/maintenance/maintenance.categories'
+import type { ItemType } from '@prisma/client'
 
 interface Part {
   name: string
@@ -28,9 +19,10 @@ interface Part {
   unitPrice: number | undefined
 }
 
-export function AddMaintenanceForm({ itemId, onSuccess }: { itemId: string; onSuccess: () => void }) {
+export function AddMaintenanceForm({ itemId, itemType, onSuccess }: { itemId: string; itemType: ItemType; onSuccess: () => void }) {
+  const categories = getMaintenanceCategories(itemType)
   const [title, setTitle] = useState('')
-  const [category, setCategory] = useState('OTHER')
+  const [category, setCategory] = useState(categories[categories.length - 1]?.value ?? 'OTHER')
   const [performedAt, setPerformedAt] = useState(new Date().toISOString().slice(0, 10))
   const [odometerValue, setOdometerValue] = useState('')
   const [notes, setNotes] = useState('')
@@ -67,28 +59,30 @@ export function AddMaintenanceForm({ itemId, onSuccess }: { itemId: string; onSu
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label htmlFor="title">Title *</Label>
-              <Input id="title" value={title} onChange={(e) => setTitle((e.target as HTMLInputElement).value)} placeholder="e.g. Oil change" required />
+              <Input id="title" value={title} onChange={(e) => setTitle((e.target as HTMLInputElement).value)} placeholder={`e.g. ${categories[0]?.label ?? 'Maintenance'}`} required />
             </div>
             <div className="space-y-2">
               <Label>Category *</Label>
               <Select value={category} onValueChange={(v) => { if (v !== null) setCategory(v) }}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+                  {categories.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className={itemType === 'VEHICLE' ? 'grid grid-cols-2 gap-3' : 'grid grid-cols-1 gap-3'}>
             <div className="space-y-2">
               <Label htmlFor="date">Date *</Label>
               <Input id="date" type="date" value={performedAt} onChange={(e) => setPerformedAt((e.target as HTMLInputElement).value)} required />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="odometer">Odometer (km)</Label>
-              <Input id="odometer" type="number" value={odometerValue} onChange={(e) => setOdometerValue((e.target as HTMLInputElement).value)} placeholder="e.g. 55000" min="0" />
-            </div>
+            {itemType === 'VEHICLE' && (
+              <div className="space-y-2">
+                <Label htmlFor="odometer">Odometer (km)</Label>
+                <Input id="odometer" type="number" value={odometerValue} onChange={(e) => setOdometerValue((e.target as HTMLInputElement).value)} placeholder="e.g. 55000" min="0" />
+              </div>
+            )}
           </div>
 
           {/* Parts */}

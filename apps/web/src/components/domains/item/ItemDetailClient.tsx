@@ -154,6 +154,7 @@ export function ItemDetailClient({ itemId }: { itemId: string }) {
             <div className="mb-4 animate-in slide-in-from-top-2 duration-200">
               <AddMaintenanceForm
                 itemId={itemId}
+                itemType={item.data.type}
                 onSuccess={() => { setShowAddForm(false); void records.refetch() }}
               />
             </div>
