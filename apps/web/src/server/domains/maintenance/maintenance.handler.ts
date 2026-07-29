@@ -61,6 +61,7 @@ export const maintenanceRouter = createTRPCRouter({
         performedAt: z.coerce.date().optional(),
         odometerValue: z.number().nonnegative().optional(),
         notes: z.string().max(2000).optional(),
+        parts: z.array(PartInputSchema).optional(),
       })
     )
     .mutation(({ ctx, input }) => {

@@ -161,7 +161,7 @@ export function ItemDetailClient({ itemId }: { itemId: string }) {
           )}
 
           {records.isLoading && <Skeleton className="h-24 rounded-xl" />}
-          {records.data && <MaintenanceList records={records.data} />}
+          {records.data && <MaintenanceList records={records.data} itemType={item.data.type} />}
         </div>
       </div>
     </div>

@@ -71,11 +71,25 @@ export class MaintenanceRepository {
       odometerValue?: number | null
       notes?: string | null
       costTotal?: number | null
+      parts?: Array<{
+        name: string
+        category?: string | null
+        quantity: number
+        unit: string
+        unitPrice?: number | null
+        totalPrice?: number | null
+      }>
     }
   ): Promise<MaintenanceRecordWithParts> {
+    const { parts, ...record } = data
     return this.db.maintenanceRecord.update({
       where: { id },
-      data,
+      data: {
+        ...record,
+        // Full replace: simpler and safer than diffing individual part rows,
+        // and matches how create() writes parts in one shot.
+        parts: parts ? { deleteMany: {}, create: parts } : undefined,
+      },
       include: { parts: true },
     })
   }

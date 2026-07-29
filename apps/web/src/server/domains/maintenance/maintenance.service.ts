@@ -67,11 +67,27 @@ export class MaintenanceService {
       performedAt?: Date
       odometerValue?: number | null
       notes?: string | null
+      parts?: Array<{
+        name: string
+        category?: string | null
+        quantity: number
+        unit: string
+        unitPrice?: number | null
+      }>
     }
   ): Promise<MaintenanceRecordWithParts> {
     const record = await this.maintenanceRepo.findByIdAndUserId(id, userId)
     if (!record) throw new TRPCError({ code: 'NOT_FOUND', message: 'errors.maintenance.not_found' })
-    return this.maintenanceRepo.update(id, input)
+
+    const { parts, ...rest } = input
+    if (!parts) return this.maintenanceRepo.update(id, rest)
+
+    const costTotal = calculateCostTotal(parts)
+    const partsWithTotal = parts.map((p) => ({
+      ...p,
+      totalPrice: p.quantity * (p.unitPrice ?? 0),
+    }))
+    return this.maintenanceRepo.update(id, { ...rest, costTotal, parts: partsWithTotal })
   }
 
   async delete(id: string, userId: string): Promise<void> {
