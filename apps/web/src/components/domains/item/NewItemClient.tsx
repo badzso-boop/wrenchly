@@ -1,8 +1,9 @@
 'use client'
 import { api } from '@/lib/trpc/client'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useState } from 'react'
 import { ArrowLeft } from 'lucide-react'
+import { getProfileFields } from '@/server/domains/profile/profile.fields'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -30,21 +31,62 @@ const ITEM_TYPES: { value: ItemType; label: string }[] = [
   { value: 'CUSTOM', label: '📦 Custom' },
 ]
 
+// Only shown for types with no dedicated profile (VEHICLE has its own make/model on
+// VehicleProfile; MACHINE/TOOL/DEVICE/CUSTOM have nothing else, so the generic fields
+// here are the only place to record a brand/model for them).
+const NAME_EXAMPLES: Partial<Record<ItemType, string>> = {
+  VEHICLE: 'e.g. Ford Focus 2015',
+  PROPERTY: 'e.g. Main House',
+  PLANT: 'e.g. Living room Monstera',
+  MACHINE: 'e.g. Table saw',
+  TOOL: 'e.g. Cordless drill',
+  DEVICE: 'e.g. Laptop',
+  PRINTER_3D: 'e.g. Bedroom printer',
+  PET: 'e.g. Rex',
+  AQUARIUM: 'e.g. Living room tank',
+  POOL: 'e.g. Backyard pool',
+  BOAT: 'e.g. Weekend sailboat',
+  DRONE: 'e.g. Racing drone',
+  INSTRUMENT: 'e.g. Acoustic guitar',
+  BICYCLE: 'e.g. Commuter bike',
+  SOLAR: 'e.g. Roof solar array',
+  CUSTOM: 'e.g. Home server',
+}
+
+function isItemType(value: string | null): value is ItemType {
+  return value !== null && ITEM_TYPES.some((t) => t.value === value)
+}
+
 export function NewItemClient() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const initialType = searchParams.get('type')
   const [name, setName] = useState('')
-  const [type, setType] = useState<ItemType>('VEHICLE')
+  const [type, setType] = useState<ItemType>(isItemType(initialType) ? initialType : 'VEHICLE')
   const [brand, setBrand] = useState('')
   const [model, setModel] = useState('')
   const [description, setDescription] = useState('')
 
+  const hasProfileFields = getProfileFields(type) !== null
+  const showGenericBrandModel = !hasProfileFields
+
   const createItem = api.item.create.useMutation({
-    onSuccess: (item) => router.push(`/items/${item.id}`),
+    onSuccess: (item) => {
+      if (type === 'VEHICLE') router.push(`/items/${item.id}/vehicle`)
+      else if (hasProfileFields || type === 'CUSTOM') router.push(`/items/${item.id}/profile`)
+      else router.push(`/items/${item.id}`)
+    },
   })
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    createItem.mutate({ name, type, brand: brand || undefined, model: model || undefined, description: description || undefined })
+    createItem.mutate({
+      name,
+      type,
+      brand: showGenericBrandModel ? brand || undefined : undefined,
+      model: showGenericBrandModel ? model || undefined : undefined,
+      description: description || undefined,
+    })
   }
 
   return (
@@ -70,7 +112,7 @@ export function NewItemClient() {
                     id="name"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="e.g. Ford Focus 2015"
+                    placeholder={NAME_EXAMPLES[type] ?? 'e.g. My item'}
                     required
                   />
                 </div>
@@ -89,26 +131,35 @@ export function NewItemClient() {
                   </Select>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="brand">Brand</Label>
-                    <Input
-                      id="brand"
-                      value={brand}
-                      onChange={(e) => setBrand(e.target.value)}
-                      placeholder="e.g. Ford"
-                    />
+                {showGenericBrandModel && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="brand">Brand</Label>
+                      <Input
+                        id="brand"
+                        value={brand}
+                        onChange={(e) => setBrand(e.target.value)}
+                        placeholder="e.g. Ford"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="model">Model</Label>
+                      <Input
+                        id="model"
+                        value={model}
+                        onChange={(e) => setModel(e.target.value)}
+                        placeholder="e.g. Focus"
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="model">Model</Label>
-                    <Input
-                      id="model"
-                      value={model}
-                      onChange={(e) => setModel(e.target.value)}
-                      placeholder="e.g. Focus"
-                    />
-                  </div>
-                </div>
+                )}
+
+                {hasProfileFields && (
+                  <p className="text-sm text-muted-foreground">
+                    You&apos;ll fill in {ITEM_TYPES.find((t) => t.value === type)?.label.replace(/^\S+\s/, '')}-specific
+                    details (like watering schedule, breed, engine hours…) right after creating this item.
+                  </p>
+                )}
 
                 <div className="space-y-2">
                   <Label htmlFor="description">Description</Label>

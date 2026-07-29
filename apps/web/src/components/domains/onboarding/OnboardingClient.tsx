@@ -34,7 +34,9 @@ export function OnboardingClient() {
 
   const updateStep = api.onboarding.updateStep.useMutation()
   const complete = api.onboarding.complete.useMutation({
-    onSuccess: () => router.push('/dashboard'),
+    onSuccess: () => {
+      router.push(selected.length > 0 ? `/items/new?type=${selected[0]}` : '/dashboard')
+    },
   })
 
   function toggle(value: string) {
