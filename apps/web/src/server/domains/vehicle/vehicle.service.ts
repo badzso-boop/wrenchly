@@ -15,11 +15,9 @@ export class VehicleService {
     private db: PrismaClient
   ) {}
 
-  async getByItemId(itemId: string, userId: string): Promise<VehicleProfile> {
+  async getByItemId(itemId: string, userId: string): Promise<VehicleProfile | null> {
     await this.assertItemOwnership(itemId, userId)
-    const profile = await this.vehicleRepo.findByItemId(itemId)
-    if (!profile) throw new TRPCError({ code: 'NOT_FOUND', message: 'errors.vehicle.not_found' })
-    return profile
+    return this.vehicleRepo.findByItemId(itemId)
   }
 
   async create(
