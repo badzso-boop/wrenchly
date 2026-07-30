@@ -116,6 +116,7 @@ model Item {
   photos             Photo[]
   shareExports       ShareExport[]
   tripLogs           TripLog[]
+  readings           ItemReading[]
 
   vehicleProfile    VehicleProfile?
   propertyProfile   PropertyProfile?
@@ -273,6 +274,21 @@ enum TripExpenseType {
   VIGNETTE
   PARKING
   OTHER
+}
+
+model ItemReading {
+  id         String   @id @default(cuid())
+  itemId     String
+  userId     String
+  recordedAt DateTime
+  metrics    Json // Record<string, number>; keys defined per item type by READING_METRICS
+  notes      String?
+  createdAt  DateTime @default(now())
+
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([itemId, recordedAt])
+  @@map("item_readings")
 }
 
 model Photo {
