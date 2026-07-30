@@ -117,6 +117,7 @@ model Item {
   shareExports       ShareExport[]
   tripLogs           TripLog[]
   readings           ItemReading[]
+  printJobs          PrintJob[]
 
   vehicleProfile    VehicleProfile?
   propertyProfile   PropertyProfile?
@@ -293,6 +294,26 @@ model ItemReading {
 
   @@index([itemId, recordedAt])
   @@map("item_readings")
+}
+
+model PrintJob {
+  id            String   @id @default(cuid())
+  itemId        String
+  userId        String
+  startedAt     DateTime
+  durationMin   Int?
+  filamentGrams Int
+  materialType  String // free string (PLA/PETG/ABS/TPU/Resin/Other), not a DB enum -- same
+  // convention as maintenance.category, so the value list can grow
+  // without a migration
+  success       Boolean  @default(true)
+  notes         String?
+  createdAt     DateTime @default(now())
+
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([itemId, startedAt])
+  @@map("print_jobs")
 }
 
 model Photo {
