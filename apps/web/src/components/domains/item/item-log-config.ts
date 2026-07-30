@@ -17,6 +17,18 @@ const ITEM_TYPE_LOG_CONFIG: Partial<Record<ItemType, ExtraTabDef[]>> = {
     { hrefSuffix: '/trips', label: 'Trip Log', icon: Route },
     { hrefSuffix: '/statistics', label: 'Statistics', icon: BarChart3 },
   ],
+  BOAT: [
+    { hrefSuffix: '/trips', label: 'Voyage Log', icon: Route },
+    { hrefSuffix: '/statistics', label: 'Statistics', icon: BarChart3 },
+  ],
+  BICYCLE: [
+    { hrefSuffix: '/trips', label: 'Ride Log', icon: Route },
+    { hrefSuffix: '/statistics', label: 'Statistics', icon: BarChart3 },
+  ],
+  DRONE: [
+    { hrefSuffix: '/trips', label: 'Flight Log', icon: Route },
+    { hrefSuffix: '/statistics', label: 'Statistics', icon: BarChart3 },
+  ],
   PET: [
     { hrefSuffix: '/readings', label: 'Readings', icon: LineChart },
     { hrefSuffix: '/statistics', label: 'Statistics', icon: BarChart3 },

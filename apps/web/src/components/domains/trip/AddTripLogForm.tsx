@@ -11,6 +11,8 @@ import { DateField } from '@/components/ui/date-field'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { FUEL_TYPES } from '@/components/domains/vehicle/VehicleProfileClient'
+import { getTripLogLabels } from '@/server/domains/trip/trip.labels'
+import type { ItemType } from '@prisma/client'
 
 const CURRENCIES = ['HUF', 'EUR', 'USD', 'GBP', 'CHF']
 
@@ -45,11 +47,17 @@ function emptyExpense(): ExpenseForm {
   return { type: 'TOLL', amount: '', currency: 'HUF', description: '' }
 }
 
-export function AddTripLogForm({ itemId, onSuccess }: { itemId: string; onSuccess: () => void }) {
-  const profile = api.vehicle.getByItemId.useQuery({ itemId })
+export function AddTripLogForm({ itemId, itemType, onSuccess }: { itemId: string; itemType: ItemType; onSuccess: () => void }) {
+  const labels = getTripLogLabels(itemType)
+  const isVehicle = itemType === 'VEHICLE'
+  const profile = api.vehicle.getByItemId.useQuery({ itemId }, { enabled: isVehicle })
   const [startedAt, setStartedAt] = useState(new Date().toISOString().slice(0, 10))
   const [startOdometer, setStartOdometer] = useState('')
   const [distanceKm, setDistanceKm] = useState('')
+  const [durationMin, setDurationMin] = useState('')
+  const [elevationGainM, setElevationGainM] = useState('')
+  const [batteryPercentUsed, setBatteryPercentUsed] = useState('')
+  const [maxAltitudeM, setMaxAltitudeM] = useState('')
   const [description, setDescription] = useState('')
   const [notes, setNotes] = useState('')
   const [startFuelLiters, setStartFuelLiters] = useState('')
@@ -89,6 +97,8 @@ export function AddTripLogForm({ itemId, onSuccess }: { itemId: string; onSucces
     setExpenses(expenses.filter((_, i) => i !== index))
   }
 
+  if (!labels) return null
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     createTrip.mutate({
@@ -96,8 +106,12 @@ export function AddTripLogForm({ itemId, onSuccess }: { itemId: string; onSucces
       startedAt: new Date(startedAt),
       description: description || undefined,
       notes: notes || undefined,
-      startOdometer: Number(startOdometer),
-      distanceKm: Number(distanceKm),
+      startOdometer: labels!.showOdometerFields ? Number(startOdometer) : undefined,
+      distanceKm: distanceKm ? Number(distanceKm) : undefined,
+      durationMin: durationMin ? Number(durationMin) : undefined,
+      elevationGainM: elevationGainM ? Number(elevationGainM) : undefined,
+      batteryPercentUsed: batteryPercentUsed ? Number(batteryPercentUsed) : undefined,
+      maxAltitudeM: maxAltitudeM ? Number(maxAltitudeM) : undefined,
       startFuelLiters: startFuelLiters ? Number(startFuelLiters) : undefined,
       fuelStops: fuelStops
         .filter((f) => f.quantity && f.pricePerUnit)
@@ -120,9 +134,11 @@ export function AddTripLogForm({ itemId, onSuccess }: { itemId: string; onSucces
     })
   }
 
+  const canSubmit = (!labels.showOdometerFields || startOdometer) && (!labels.distanceRequired || distanceKm)
+
   return (
     <Card>
-      <CardHeader className="pb-4"><CardTitle className="text-base">Log Trip</CardTitle></CardHeader>
+      <CardHeader className="pb-4"><CardTitle className="text-base">{labels.formTitle}</CardTitle></CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
@@ -137,101 +153,137 @@ export function AddTripLogForm({ itemId, onSuccess }: { itemId: string; onSucces
           </div>
 
           <div className="grid grid-cols-2 gap-3">
+            {labels.showOdometerFields && (
+              <div className="space-y-2">
+                <Label htmlFor="trip-start-odo">{labels.startFieldLabel} *</Label>
+                <Input id="trip-start-odo" type="number" value={startOdometer} onChange={(e) => setStartOdometer((e.target as HTMLInputElement).value)} min="0" required />
+              </div>
+            )}
             <div className="space-y-2">
-              <Label htmlFor="trip-start-odo">Starting odometer (km) *</Label>
-              <Input id="trip-start-odo" type="number" value={startOdometer} onChange={(e) => setStartOdometer((e.target as HTMLInputElement).value)} min="0" required />
+              <Label htmlFor="trip-distance">{labels.distanceFieldLabel}{labels.distanceRequired ? ' *' : ''}</Label>
+              <Input
+                id="trip-distance"
+                type="number"
+                value={distanceKm}
+                onChange={(e) => setDistanceKm((e.target as HTMLInputElement).value)}
+                min="0"
+                required={labels.distanceRequired}
+                placeholder={labels.distanceRequired ? undefined : 'Optional'}
+              />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="trip-distance">Distance traveled (km) *</Label>
-              <Input id="trip-distance" type="number" value={distanceKm} onChange={(e) => setDistanceKm((e.target as HTMLInputElement).value)} min="1" required />
-            </div>
+            {labels.showDuration && (
+              <div className="space-y-2">
+                <Label htmlFor="trip-duration">Duration (min)</Label>
+                <Input id="trip-duration" type="number" value={durationMin} onChange={(e) => setDurationMin((e.target as HTMLInputElement).value)} min="0" placeholder="Optional" />
+              </div>
+            )}
+            {labels.showElevation && (
+              <div className="space-y-2">
+                <Label htmlFor="trip-elevation">Elevation gain (m)</Label>
+                <Input id="trip-elevation" type="number" value={elevationGainM} onChange={(e) => setElevationGainM((e.target as HTMLInputElement).value)} min="0" placeholder="Optional" />
+              </div>
+            )}
+            {labels.showBattery && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="trip-battery">Battery used (%)</Label>
+                  <Input id="trip-battery" type="number" value={batteryPercentUsed} onChange={(e) => setBatteryPercentUsed((e.target as HTMLInputElement).value)} min="0" max="100" placeholder="Optional" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="trip-altitude">Max altitude (m)</Label>
+                  <Input id="trip-altitude" type="number" value={maxAltitudeM} onChange={(e) => setMaxAltitudeM((e.target as HTMLInputElement).value)} min="0" placeholder="Optional" />
+                </div>
+              </>
+            )}
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="trip-start-fuel">Approx. fuel at start (liters)</Label>
-            <Input id="trip-start-fuel" type="number" value={startFuelLiters} onChange={(e) => setStartFuelLiters((e.target as HTMLInputElement).value)} min="0" placeholder="Optional" />
-          </div>
+          {labels.showFuelSection && (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="trip-start-fuel">Approx. fuel at start (liters)</Label>
+                <Input id="trip-start-fuel" type="number" value={startFuelLiters} onChange={(e) => setStartFuelLiters((e.target as HTMLInputElement).value)} min="0" placeholder="Optional" />
+              </div>
 
-          {/* Fuel stops */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <Label>Fuel Stops</Label>
-              <Button type="button" variant="ghost" size="sm" onClick={addFuelStop} className="h-7 text-xs">
-                <Plus className="h-3 w-3 mr-1" /> Add Fuel Stop
-              </Button>
-            </div>
-            {fuelStops.map((stop, i) => {
-              const total = (Number(stop.quantity) || 0) * (Number(stop.pricePerUnit) || 0)
-              return (
-                <div key={i} className="rounded-lg border p-3 mb-2 space-y-2">
-                  <div className="grid grid-cols-4 gap-2">
-                    <Input type="number" value={stop.quantity} onChange={(e) => updateFuelStop(i, 'quantity', (e.target as HTMLInputElement).value)} placeholder="Qty" min="0" step="0.01" className="h-8 text-sm" />
-                    <Select value={stop.unit} onValueChange={(v) => { if (v !== null) updateFuelStop(i, 'unit', v) }}>
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <Label>Fuel Stops</Label>
+                  <Button type="button" variant="ghost" size="sm" onClick={addFuelStop} className="h-7 text-xs">
+                    <Plus className="h-3 w-3 mr-1" /> Add Fuel Stop
+                  </Button>
+                </div>
+                {fuelStops.map((stop, i) => {
+                  const total = (Number(stop.quantity) || 0) * (Number(stop.pricePerUnit) || 0)
+                  return (
+                    <div key={i} className="rounded-lg border p-3 mb-2 space-y-2">
+                      <div className="grid grid-cols-4 gap-2">
+                        <Input type="number" value={stop.quantity} onChange={(e) => updateFuelStop(i, 'quantity', (e.target as HTMLInputElement).value)} placeholder="Qty" min="0" step="0.01" className="h-8 text-sm" />
+                        <Select value={stop.unit} onValueChange={(v) => { if (v !== null) updateFuelStop(i, 'unit', v) }}>
+                          <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="liter">liter</SelectItem>
+                            <SelectItem value="kWh">kWh</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Input type="number" value={stop.pricePerUnit} onChange={(e) => updateFuelStop(i, 'pricePerUnit', (e.target as HTMLInputElement).value)} placeholder="Price/unit" min="0" className="h-8 text-sm" />
+                        <Select value={stop.currency} onValueChange={(v) => { if (v !== null) updateFuelStop(i, 'currency', v) }}>
+                          <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {CURRENCIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="grid grid-cols-4 gap-2 items-center">
+                        <Select value={stop.fuelType || 'none'} onValueChange={(v) => { if (v !== null) updateFuelStop(i, 'fuelType', v === 'none' ? '' : v) }}>
+                          <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Fuel type" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Fuel type</SelectItem>
+                            {FUEL_TYPES.map((ft) => <SelectItem key={ft} value={ft}>{ft}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                        <Input value={stop.station} onChange={(e) => updateFuelStop(i, 'station', (e.target as HTMLInputElement).value)} placeholder="Station (optional)" className="h-8 text-sm col-span-2" />
+                        <div className="flex items-center justify-end gap-1">
+                          <span className="text-xs text-muted-foreground tabular-nums">{total.toLocaleString()} {stop.currency}</span>
+                          <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => removeFuelStop(i)}>
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <Label>Tolls, Vignettes &amp; Parking</Label>
+                  <Button type="button" variant="ghost" size="sm" onClick={addExpense} className="h-7 text-xs">
+                    <Plus className="h-3 w-3 mr-1" /> Add Expense
+                  </Button>
+                </div>
+                {expenses.map((ex, i) => (
+                  <div key={i} className="grid grid-cols-5 gap-2 mb-2 items-center">
+                    <Select value={ex.type} onValueChange={(v) => { if (v !== null) updateExpense(i, 'type', v) }}>
                       <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="liter">liter</SelectItem>
-                        <SelectItem value="kWh">kWh</SelectItem>
+                        {EXPENSE_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
                       </SelectContent>
                     </Select>
-                    <Input type="number" value={stop.pricePerUnit} onChange={(e) => updateFuelStop(i, 'pricePerUnit', (e.target as HTMLInputElement).value)} placeholder="Price/unit" min="0" className="h-8 text-sm" />
-                    <Select value={stop.currency} onValueChange={(v) => { if (v !== null) updateFuelStop(i, 'currency', v) }}>
+                    <Input type="number" value={ex.amount} onChange={(e) => updateExpense(i, 'amount', (e.target as HTMLInputElement).value)} placeholder="Amount" min="0" className="h-8 text-sm" />
+                    <Select value={ex.currency} onValueChange={(v) => { if (v !== null) updateExpense(i, 'currency', v) }}>
                       <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         {CURRENCIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                       </SelectContent>
                     </Select>
+                    <Input value={ex.description} onChange={(e) => updateExpense(i, 'description', (e.target as HTMLInputElement).value)} placeholder="Note" className="h-8 text-sm" />
+                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive justify-self-end" onClick={() => removeExpense(i)}>
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
                   </div>
-                  <div className="grid grid-cols-4 gap-2 items-center">
-                    <Select value={stop.fuelType || 'none'} onValueChange={(v) => { if (v !== null) updateFuelStop(i, 'fuelType', v === 'none' ? '' : v) }}>
-                      <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Fuel type" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Fuel type</SelectItem>
-                        {FUEL_TYPES.map((ft) => <SelectItem key={ft} value={ft}>{ft}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    <Input value={stop.station} onChange={(e) => updateFuelStop(i, 'station', (e.target as HTMLInputElement).value)} placeholder="Station (optional)" className="h-8 text-sm col-span-2" />
-                    <div className="flex items-center justify-end gap-1">
-                      <span className="text-xs text-muted-foreground tabular-nums">{total.toLocaleString()} {stop.currency}</span>
-                      <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => removeFuelStop(i)}>
-                        <X className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-
-          {/* Expenses */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <Label>Tolls, Vignettes &amp; Parking</Label>
-              <Button type="button" variant="ghost" size="sm" onClick={addExpense} className="h-7 text-xs">
-                <Plus className="h-3 w-3 mr-1" /> Add Expense
-              </Button>
-            </div>
-            {expenses.map((ex, i) => (
-              <div key={i} className="grid grid-cols-5 gap-2 mb-2 items-center">
-                <Select value={ex.type} onValueChange={(v) => { if (v !== null) updateExpense(i, 'type', v) }}>
-                  <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {EXPENSE_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <Input type="number" value={ex.amount} onChange={(e) => updateExpense(i, 'amount', (e.target as HTMLInputElement).value)} placeholder="Amount" min="0" className="h-8 text-sm" />
-                <Select value={ex.currency} onValueChange={(v) => { if (v !== null) updateExpense(i, 'currency', v) }}>
-                  <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {CURRENCIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <Input value={ex.description} onChange={(e) => updateExpense(i, 'description', (e.target as HTMLInputElement).value)} placeholder="Note" className="h-8 text-sm" />
-                <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive justify-self-end" onClick={() => removeExpense(i)}>
-                  <X className="h-3.5 w-3.5" />
-                </Button>
+                ))}
               </div>
-            ))}
-          </div>
+            </>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="trip-notes">What happened on the way</Label>
@@ -240,8 +292,8 @@ export function AddTripLogForm({ itemId, onSuccess }: { itemId: string; onSucces
 
           {createTrip.error && <p className="text-sm text-destructive">{createTrip.error.message}</p>}
 
-          <Button type="submit" className="w-full" disabled={createTrip.isPending || !startOdometer || !distanceKm}>
-            {createTrip.isPending ? 'Saving…' : 'Save Trip'}
+          <Button type="submit" className="w-full" disabled={createTrip.isPending || !canSubmit}>
+            {createTrip.isPending ? 'Saving…' : 'Save'}
           </Button>
         </form>
       </CardContent>
