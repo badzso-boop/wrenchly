@@ -18,7 +18,7 @@ export function VehicleProfileClient({ itemId }: { itemId: string }) {
   const [editing, setEditing] = useState(false)
   const [showOdoForm, setShowOdoForm] = useState(false)
   const [newOdometer, setNewOdometer] = useState('')
-  const [form, setForm] = useState({ make: '', model: '', year: '', vin: '', fuelType: '', engineDisplacement: '', licensePlate: '', color: '' })
+  const [form, setForm] = useState({ make: '', model: '', year: '', vin: '', fuelType: '', engineDisplacement: '', licensePlate: '', color: '', fuelTankLiters: '' })
 
   const create = api.vehicle.create.useMutation({
     onSuccess: () => { profile.refetch(); setEditing(false); toast.success('Vehicle profile created') },
@@ -32,10 +32,11 @@ export function VehicleProfileClient({ itemId }: { itemId: string }) {
 
   function openEdit(forNew: boolean) {
     const p = profile.data
-    setForm(forNew || !p ? { make: '', model: '', year: '', vin: '', fuelType: '', engineDisplacement: '', licensePlate: '', color: '' } : {
+    setForm(forNew || !p ? { make: '', model: '', year: '', vin: '', fuelType: '', engineDisplacement: '', licensePlate: '', color: '', fuelTankLiters: '' } : {
       make: p.make, model: p.model, year: p.year?.toString() ?? '', vin: p.vin ?? '',
       fuelType: p.fuelType ?? '', engineDisplacement: p.engineDisplacement?.toString() ?? '',
       licensePlate: p.licensePlate ?? '', color: p.color ?? '',
+      fuelTankLiters: p.fuelTankLiters?.toString() ?? '',
     })
     setEditing(true)
   }
@@ -50,6 +51,7 @@ export function VehicleProfileClient({ itemId }: { itemId: string }) {
       engineDisplacement: form.engineDisplacement ? Number(form.engineDisplacement) : undefined,
       licensePlate: form.licensePlate || undefined,
       color: form.color || undefined,
+      fuelTankLiters: form.fuelTankLiters ? Number(form.fuelTankLiters) : undefined,
     }
     if (profile.data) update.mutate({ itemId, ...data })
     else create.mutate({ itemId, ...data })
@@ -72,7 +74,7 @@ export function VehicleProfileClient({ itemId }: { itemId: string }) {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
-                {([['Make', p.make], ['Model', p.model], p.year && ['Year', String(p.year)], p.fuelType && ['Fuel', p.fuelType], p.engineDisplacement && ['Engine (cc)', String(p.engineDisplacement)], p.licensePlate && ['Plate', p.licensePlate], p.color && ['Color', p.color]].filter(Boolean) as string[][]).map(([label, value]) => (
+                {([['Make', p.make], ['Model', p.model], p.year && ['Year', String(p.year)], p.fuelType && ['Fuel', p.fuelType], p.engineDisplacement && ['Engine (cc)', String(p.engineDisplacement)], p.licensePlate && ['Plate', p.licensePlate], p.color && ['Color', p.color], p.fuelTankLiters && ['Tank size', `${p.fuelTankLiters} L`]].filter(Boolean) as string[][]).map(([label, value]) => (
                   <div key={label}>
                     <p className="text-muted-foreground text-xs mb-0.5">{label}</p>
                     <p className="font-medium">{value}</p>
@@ -197,6 +199,10 @@ export function VehicleProfileClient({ itemId }: { itemId: string }) {
                   <Label htmlFor="vin">VIN (17 chars)</Label>
                   <Input id="vin" value={form.vin} onChange={(e) => setForm((f) => ({ ...f, vin: (e.target as HTMLInputElement).value.toUpperCase() }))} maxLength={17} pattern="[A-HJ-NPR-Z0-9]{17}" placeholder="Optional" className="font-mono" />
                 </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="tank">Fuel tank size (liters)</Label>
+                <Input id="tank" type="number" value={form.fuelTankLiters} onChange={set('fuelTankLiters')} min="0" placeholder="e.g. 55" />
               </div>
               {(create.error ?? update.error) && (
                 <p className="text-sm text-destructive">{(create.error ?? update.error)?.message}</p>
