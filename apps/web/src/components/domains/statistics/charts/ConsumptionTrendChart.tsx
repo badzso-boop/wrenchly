@@ -1,5 +1,5 @@
 'use client'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 interface TrendPoint {
   date: Date | string
@@ -68,13 +68,21 @@ export function ConsumptionTrendChart({ points }: { points: TrendPoint[] }) {
     if (pos) setActive({ index: i, ...pos })
   }
 
-  function toggleActive(i: number, e: React.MouseEvent) {
-    setActive((prev) => {
-      if (prev?.index === i) return null
-      const pos = pointerPosition(e)
-      return pos ? { index: i, ...pos } : prev
-    })
-  }
+  // Tapping a point on mobile fires a synthetic hover (mouseenter/mousemove) immediately
+  // followed by the click, both from the same single tap — if the click toggled off whenever
+  // the index was already active, that phantom hover-then-click sequence closed the tooltip
+  // right back up before it was ever visible. A tap should always show its point; dismiss by
+  // tapping elsewhere.
+  useEffect(() => {
+    if (!active) return
+    function handleOutsideClick(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setActive(null)
+      }
+    }
+    document.addEventListener('click', handleOutsideClick)
+    return () => document.removeEventListener('click', handleOutsideClick)
+  }, [active])
 
   const activeCoord = active ? coords[active.index] : undefined
 
@@ -104,7 +112,7 @@ export function ConsumptionTrendChart({ points }: { points: TrendPoint[] }) {
               onMouseEnter={(e) => trackPointer(i, e)}
               onMouseMove={(e) => trackPointer(i, e)}
               onMouseLeave={() => setActive((prev) => (prev?.index === i ? null : prev))}
-              onClick={(e) => toggleActive(i, e)}
+              onClick={(e) => trackPointer(i, e)}
             >
               {/* Invisible, generously-sized hit target — much bigger than the visible dot, easy to tap. */}
               <circle cx={c.x} cy={c.y} r={14} fill="transparent" pointerEvents="all" />

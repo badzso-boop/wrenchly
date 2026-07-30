@@ -1,5 +1,5 @@
 'use client'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 interface BarSeries {
   key: string
@@ -81,13 +81,20 @@ export function BarChart({
     if (pos) setActive({ index: i, ...pos })
   }
 
-  function toggleActive(i: number, e: React.MouseEvent) {
-    setActive((prev) => {
-      if (prev?.index === i) return null
-      const pos = pointerPosition(e)
-      return pos ? { index: i, ...pos } : prev
-    })
-  }
+  // Tapping a bar on mobile fires a synthetic hover (mouseenter/mousemove) immediately followed
+  // by the click, both from the same single tap — if the click toggled off whenever the index
+  // was already active, that phantom hover-then-click sequence closed the tooltip right back up
+  // before it was ever visible. A tap should always show its bar; dismiss by tapping elsewhere.
+  useEffect(() => {
+    if (!active) return
+    function handleOutsideClick(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setActive(null)
+      }
+    }
+    document.addEventListener('click', handleOutsideClick)
+    return () => document.removeEventListener('click', handleOutsideClick)
+  }, [active])
 
   const activeDatum = active ? data[active.index] : undefined
 
@@ -118,7 +125,7 @@ export function BarChart({
                 onMouseEnter={(e) => trackPointer(i, e)}
                 onMouseMove={(e) => trackPointer(i, e)}
                 onMouseLeave={() => setActive((prev) => (prev?.index === i ? null : prev))}
-                onClick={(e) => toggleActive(i, e)}
+                onClick={(e) => trackPointer(i, e)}
               >
                 {/* Invisible full-column hit target — bigger than the bar itself, easy to tap on mobile. */}
                 <rect x={PAD_LEFT + i * slotW} y={PAD_TOP} width={slotW} height={plotH} fill="transparent" pointerEvents="all" />
