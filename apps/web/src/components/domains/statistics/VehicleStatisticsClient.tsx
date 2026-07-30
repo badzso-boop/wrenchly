@@ -2,15 +2,16 @@
 import { api } from '@/lib/trpc/client'
 import { BarChart } from './charts/BarChart'
 import { ConsumptionTrendChart } from './charts/ConsumptionTrendChart'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 
-function StatTile({ label, value }: { label: string; value: string }) {
+function StatTile({ label, value, hint }: { label: string; value: string; hint: string }) {
   return (
     <Card>
       <CardContent className="p-4">
         <p className="text-xs text-muted-foreground mb-1">{label}</p>
         <p className="text-2xl font-semibold">{value}</p>
+        <p className="text-xs text-muted-foreground mt-1">{hint}</p>
       </CardContent>
     </Card>
   )
@@ -45,22 +46,27 @@ export function VehicleStatisticsClient({ itemId }: { itemId: string }) {
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        <StatTile label="Total distance" value={`${allTime.distanceKm.toLocaleString()} km`} />
-        <StatTile label="Total fuel cost" value={allTime.fuelCost.toLocaleString()} />
-        <StatTile label="Tolls, vignettes & parking" value={allTime.expenseCost.toLocaleString()} />
+        <StatTile label="Total distance" value={`${allTime.distanceKm.toLocaleString()} km`} hint="Since your first logged trip" />
+        <StatTile label="Total fuel cost" value={allTime.fuelCost.toLocaleString()} hint="All fuel purchases combined" />
+        <StatTile label="Tolls, vignettes & parking" value={allTime.expenseCost.toLocaleString()} hint="All logged road-usage costs" />
         <StatTile
           label="Avg. consumption (all time)"
           value={allTime.avgConsumption > 0 ? `${allTime.avgConsumption.toFixed(1)} L/100km` : '—'}
+          hint="Total fuel ÷ total distance"
         />
         <StatTile
           label="Avg. consumption (last 30 days)"
           value={last30Days.avgConsumption > 0 ? `${last30Days.avgConsumption.toFixed(1)} L/100km` : '—'}
+          hint="Recent driving only, not all-time"
         />
-        <StatTile label="Trips logged" value={String(tripCount)} />
+        <StatTile label="Trips logged" value={String(tripCount)} hint="Number of trip entries" />
       </div>
 
       <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-base">Distance per month</CardTitle></CardHeader>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Distance per month</CardTitle>
+          <CardDescription>How many km you drove each month — spot busy months vs. quiet ones.</CardDescription>
+        </CardHeader>
         <CardContent>
           <BarChart
             data={monthly.map((m) => ({ label: m.month, values: { distanceKm: m.distanceKm } }))}
@@ -70,7 +76,10 @@ export function VehicleStatisticsClient({ itemId }: { itemId: string }) {
       </Card>
 
       <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-base">Cost per month</CardTitle></CardHeader>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Cost per month</CardTitle>
+          <CardDescription>Fuel cost vs. tolls, vignettes &amp; parking side by side each month — the legend below the chart shows which color is which.</CardDescription>
+        </CardHeader>
         <CardContent>
           <BarChart
             data={monthly.map((m) => ({ label: m.month, values: { fuelCost: m.fuelCost, expenseCost: m.expenseCost } }))}
@@ -83,7 +92,10 @@ export function VehicleStatisticsClient({ itemId }: { itemId: string }) {
       </Card>
 
       <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-base">Consumption per trip (L/100km)</CardTitle></CardHeader>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Consumption per trip (L/100km)</CardTitle>
+          <CardDescription>Your fuel efficiency per trip — a rising trend can mean it's time for a maintenance check, or just more demanding driving.</CardDescription>
+        </CardHeader>
         <CardContent>
           <ConsumptionTrendChart points={consumptionTrend} />
         </CardContent>
