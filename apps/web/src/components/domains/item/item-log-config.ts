@@ -21,6 +21,42 @@ const ITEM_TYPE_LOG_CONFIG: Partial<Record<ItemType, ExtraTabDef[]>> = {
     { hrefSuffix: '/readings', label: 'Readings', icon: LineChart },
     { hrefSuffix: '/statistics', label: 'Statistics', icon: BarChart3 },
   ],
+  PLANT: [
+    { hrefSuffix: '/readings', label: 'Readings', icon: LineChart },
+    { hrefSuffix: '/statistics', label: 'Statistics', icon: BarChart3 },
+  ],
+  AQUARIUM: [
+    { hrefSuffix: '/readings', label: 'Readings', icon: LineChart },
+    { hrefSuffix: '/statistics', label: 'Statistics', icon: BarChart3 },
+  ],
+  POOL: [
+    { hrefSuffix: '/readings', label: 'Readings', icon: LineChart },
+    { hrefSuffix: '/statistics', label: 'Statistics', icon: BarChart3 },
+  ],
+  SOLAR: [
+    { hrefSuffix: '/readings', label: 'Readings', icon: LineChart },
+    { hrefSuffix: '/statistics', label: 'Statistics', icon: BarChart3 },
+  ],
+  PROPERTY: [
+    { hrefSuffix: '/readings', label: 'Readings', icon: LineChart },
+    { hrefSuffix: '/statistics', label: 'Statistics', icon: BarChart3 },
+  ],
+  MACHINE: [
+    { hrefSuffix: '/readings', label: 'Readings', icon: LineChart },
+    { hrefSuffix: '/statistics', label: 'Statistics', icon: BarChart3 },
+  ],
+  TOOL: [
+    { hrefSuffix: '/readings', label: 'Readings', icon: LineChart },
+    { hrefSuffix: '/statistics', label: 'Statistics', icon: BarChart3 },
+  ],
+  DEVICE: [
+    { hrefSuffix: '/readings', label: 'Readings', icon: LineChart },
+    { hrefSuffix: '/statistics', label: 'Statistics', icon: BarChart3 },
+  ],
+  INSTRUMENT: [
+    { hrefSuffix: '/readings', label: 'Readings', icon: LineChart },
+    { hrefSuffix: '/statistics', label: 'Statistics', icon: BarChart3 },
+  ],
 }
 
 export function getExtraTabs(itemType: ItemType, itemId: string): { href: string; label: string; icon: LucideIcon }[] {
