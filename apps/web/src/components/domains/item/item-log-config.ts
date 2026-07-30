@@ -1,5 +1,5 @@
 import type { ItemType } from '@prisma/client'
-import { Car, Route, BarChart3, LineChart, type LucideIcon } from 'lucide-react'
+import { Car, Route, BarChart3, LineChart, Printer, type LucideIcon } from 'lucide-react'
 
 interface ExtraTabDef {
   hrefSuffix: string
@@ -67,6 +67,10 @@ const ITEM_TYPE_LOG_CONFIG: Partial<Record<ItemType, ExtraTabDef[]>> = {
   ],
   INSTRUMENT: [
     { hrefSuffix: '/readings', label: 'Readings', icon: LineChart },
+    { hrefSuffix: '/statistics', label: 'Statistics', icon: BarChart3 },
+  ],
+  PRINTER_3D: [
+    { hrefSuffix: '/print-jobs', label: 'Print Jobs', icon: Printer },
     { hrefSuffix: '/statistics', label: 'Statistics', icon: BarChart3 },
   ],
 }
