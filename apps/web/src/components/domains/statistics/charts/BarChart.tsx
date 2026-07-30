@@ -1,3 +1,6 @@
+'use client'
+import { useState } from 'react'
+
 interface BarSeries {
   key: string
   label: string
@@ -30,6 +33,8 @@ export function BarChart({
   series: BarSeries[]
   valueFormatter?: (n: number) => string
 }) {
+  const [activeIndex, setActiveIndex] = useState<number | null>(null)
+
   const W = 300
   const H = 160
   const PAD_LEFT = 34
@@ -53,55 +58,86 @@ export function BarChart({
     return <p className="text-sm text-muted-foreground py-8 text-center">Not enough data yet.</p>
   }
 
+  const active = activeIndex != null ? data[activeIndex] : undefined
+  const tooltipLeft = activeIndex != null
+    ? Math.min(92, Math.max(8, ((PAD_LEFT + activeIndex * slotW + slotW / 2) / W) * 100))
+    : 0
+
   return (
     <div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-40" role="img" aria-label="Bar chart">
-        {gridSteps.map((v, i) => {
-          const y = PAD_TOP + plotH - (v / max) * plotH
-          return (
-            <g key={i}>
-              <line x1={PAD_LEFT} x2={W - 4} y1={y} y2={y} className="stroke-border" strokeWidth={1} />
-              <text x={PAD_LEFT - 4} y={y + 3} textAnchor="end" className="fill-muted-foreground" fontSize={7}>
-                {valueFormatter(Math.round(v))}
-              </text>
-            </g>
-          )
-        })}
-
-        {data.map((d, i) => {
-          const x = PAD_LEFT + i * slotW + (slotW - barW) / 2
-          let yCursor = PAD_TOP + plotH
-          return (
-            <g key={d.label}>
-              {series.map((s) => {
-                const value = d.values[s.key] ?? 0
-                if (value <= 0) return null
-                const segH = (value / max) * plotH
-                const y = yCursor - segH
-                yCursor = y - gap
-                return (
-                  <rect
-                    key={s.key}
-                    x={x}
-                    y={y}
-                    width={barW}
-                    height={Math.max(0, segH)}
-                    rx={2}
-                    className={s.colorClass}
-                  >
-                    <title>{`${d.label} — ${s.label}: ${valueFormatter(value)}`}</title>
-                  </rect>
-                )
-              })}
-              {i % labelStride === 0 && (
-                <text x={x + barW / 2} y={H - 6} textAnchor="middle" className="fill-muted-foreground" fontSize={7}>
-                  {d.label}
+      <div className="relative">
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-40" role="img" aria-label="Bar chart">
+          {gridSteps.map((v, i) => {
+            const y = PAD_TOP + plotH - (v / max) * plotH
+            return (
+              <g key={i}>
+                <line x1={PAD_LEFT} x2={W - 4} y1={y} y2={y} className="stroke-border" strokeWidth={1} />
+                <text x={PAD_LEFT - 4} y={y + 3} textAnchor="end" className="fill-muted-foreground" fontSize={7}>
+                  {valueFormatter(Math.round(v))}
                 </text>
-              )}
-            </g>
-          )
-        })}
-      </svg>
+              </g>
+            )
+          })}
+
+          {data.map((d, i) => {
+            const x = PAD_LEFT + i * slotW + (slotW - barW) / 2
+            const isActive = activeIndex === i
+            let yCursor = PAD_TOP + plotH
+            return (
+              <g
+                key={d.label}
+                className="cursor-pointer"
+                onMouseEnter={() => setActiveIndex(i)}
+                onMouseLeave={() => setActiveIndex((prev) => (prev === i ? null : prev))}
+                onClick={() => setActiveIndex((prev) => (prev === i ? null : i))}
+              >
+                {/* Invisible full-column hit target — bigger than the bar itself, easy to tap on mobile. */}
+                <rect x={PAD_LEFT + i * slotW} y={PAD_TOP} width={slotW} height={plotH} fill="transparent" pointerEvents="all" />
+                {series.map((s) => {
+                  const value = d.values[s.key] ?? 0
+                  if (value <= 0) return null
+                  const segH = (value / max) * plotH
+                  const y = yCursor - segH
+                  yCursor = y - gap
+                  return (
+                    <rect
+                      key={s.key}
+                      x={x}
+                      y={y}
+                      width={barW}
+                      height={Math.max(0, segH)}
+                      rx={2}
+                      className={s.colorClass}
+                      opacity={isActive ? 1 : 0.88}
+                    />
+                  )
+                })}
+                {i % labelStride === 0 && (
+                  <text x={x + barW / 2} y={H - 6} textAnchor="middle" className="fill-muted-foreground" fontSize={7}>
+                    {d.label}
+                  </text>
+                )}
+              </g>
+            )
+          })}
+        </svg>
+
+        {active && (
+          <div
+            className="pointer-events-none absolute top-1 -translate-x-1/2 whitespace-nowrap rounded-md border bg-popover px-2 py-1.5 text-xs text-popover-foreground shadow-md z-10"
+            style={{ left: `${tooltipLeft}%` }}
+          >
+            <div className="mb-0.5 font-medium">{active.label}</div>
+            {series.map((s) => (
+              <div key={s.key} className="flex items-center gap-1.5">
+                <span className={`inline-block h-1.5 w-3 rounded-sm ${s.colorClass}`} />
+                <span className="text-muted-foreground">{s.label}:</span>
+                <span className="font-semibold tabular-nums">{valueFormatter(active.values[s.key] ?? 0)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {series.length > 1 && (
         <div className="flex items-center gap-4 mt-1 justify-center">

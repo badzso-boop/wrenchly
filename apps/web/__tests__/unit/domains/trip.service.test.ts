@@ -190,8 +190,8 @@ describe('TripService.getStatistics', () => {
     mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1' })
     const now = new Date()
     mockTripRepo.findAllByItemId.mockResolvedValue([
-      { startedAt: now, distanceKm: 500, totalFuelQty: 35, totalFuelCost: 21000, totalExpenseCost: 0 },
-      { startedAt: now, distanceKm: 500, totalFuelQty: 35, totalFuelCost: 21000, totalExpenseCost: 0 },
+      { startedAt: now, distanceKm: 500, totalFuelQty: 35, totalFuelCost: 21000, totalExpenseCost: 0, fuelStops: [], expenses: [] },
+      { startedAt: now, distanceKm: 500, totalFuelQty: 35, totalFuelCost: 21000, totalExpenseCost: 0, fuelStops: [], expenses: [] },
     ])
 
     const stats = await service.getStatistics('item-1', 'user-1')
@@ -217,13 +217,43 @@ describe('TripService.getStatistics', () => {
     const recent = new Date()
     const old = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000)
     mockTripRepo.findAllByItemId.mockResolvedValue([
-      { startedAt: recent, distanceKm: 300, totalFuelQty: 21, totalFuelCost: 12600, totalExpenseCost: 0 },
-      { startedAt: old, distanceKm: 300, totalFuelQty: 21, totalFuelCost: 12600, totalExpenseCost: 0 },
+      { startedAt: recent, distanceKm: 300, totalFuelQty: 21, totalFuelCost: 12600, totalExpenseCost: 0, fuelStops: [], expenses: [] },
+      { startedAt: old, distanceKm: 300, totalFuelQty: 21, totalFuelCost: 12600, totalExpenseCost: 0, fuelStops: [], expenses: [] },
     ])
 
     const stats = await service.getStatistics('item-1', 'user-1')
 
     expect(stats.allTime.distanceKm).toBe(600)
     expect(stats.last30Days.distanceKm).toBe(300)
+  })
+
+  it('reports a single currency when every fuel stop and expense uses it', async () => {
+    mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1' })
+    mockTripRepo.findAllByItemId.mockResolvedValue([
+      {
+        startedAt: new Date(), distanceKm: 300, totalFuelQty: 20, totalFuelCost: 12000, totalExpenseCost: 1000,
+        fuelStops: [{ currency: 'HUF' }],
+        expenses: [{ currency: 'HUF' }],
+      },
+    ])
+
+    const stats = await service.getStatistics('item-1', 'user-1')
+
+    expect(stats.currencies).toEqual(['HUF'])
+  })
+
+  it('reports every distinct currency when trips mix them', async () => {
+    mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1' })
+    mockTripRepo.findAllByItemId.mockResolvedValue([
+      {
+        startedAt: new Date(), distanceKm: 300, totalFuelQty: 20, totalFuelCost: 12000, totalExpenseCost: 1000,
+        fuelStops: [{ currency: 'HUF' }, { currency: 'EUR' }],
+        expenses: [{ currency: 'EUR' }],
+      },
+    ])
+
+    const stats = await service.getStatistics('item-1', 'user-1')
+
+    expect(stats.currencies.sort()).toEqual(['EUR', 'HUF'])
   })
 })

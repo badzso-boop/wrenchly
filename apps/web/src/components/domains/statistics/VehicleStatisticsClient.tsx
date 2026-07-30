@@ -5,6 +5,12 @@ import { ConsumptionTrendChart } from './charts/ConsumptionTrendChart'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 
+function currencyLabel(currencies: string[]): string {
+  if (currencies.length === 0) return ''
+  if (currencies.length > 1) return 'mixed currencies'
+  return currencies[0] === 'HUF' ? 'Ft' : (currencies[0] ?? '')
+}
+
 function StatTile({ label, value, hint }: { label: string; value: string; hint: string }) {
   return (
     <Card>
@@ -41,14 +47,24 @@ export function VehicleStatisticsClient({ itemId }: { itemId: string }) {
     )
   }
 
-  const { allTime, last30Days, monthly, consumptionTrend, tripCount } = stats.data
+  const { allTime, last30Days, monthly, consumptionTrend, tripCount, currencies } = stats.data
+  const currency = currencyLabel(currencies)
+  const mixedCurrencies = currencies.length > 1
 
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <StatTile label="Total distance" value={`${allTime.distanceKm.toLocaleString()} km`} hint="Since your first logged trip" />
-        <StatTile label="Total fuel cost" value={allTime.fuelCost.toLocaleString()} hint="All fuel purchases combined" />
-        <StatTile label="Tolls, vignettes & parking" value={allTime.expenseCost.toLocaleString()} hint="All logged road-usage costs" />
+        <StatTile
+          label="Total fuel cost"
+          value={`${allTime.fuelCost.toLocaleString()} ${currency}`}
+          hint={mixedCurrencies ? 'Amounts added as-is, not converted' : 'All fuel purchases combined'}
+        />
+        <StatTile
+          label="Tolls, vignettes & parking"
+          value={`${allTime.expenseCost.toLocaleString()} ${currency}`}
+          hint={mixedCurrencies ? 'Amounts added as-is, not converted' : 'All logged road-usage costs'}
+        />
         <StatTile
           label="Avg. consumption (all time)"
           value={allTime.avgConsumption > 0 ? `${allTime.avgConsumption.toFixed(1)} L/100km` : '—'}
@@ -87,6 +103,7 @@ export function VehicleStatisticsClient({ itemId }: { itemId: string }) {
               { key: 'fuelCost', label: 'Fuel', colorClass: 'fill-chart-1' },
               { key: 'expenseCost', label: 'Tolls/Parking', colorClass: 'fill-chart-2' },
             ]}
+            valueFormatter={(n) => `${n.toLocaleString()} ${currency}`}
           />
         </CardContent>
       </Card>

@@ -204,7 +204,11 @@ export class TripService {
         consumption: Number(t.totalFuelQty) / (t.distanceKm / 100),
       }))
 
-    return { allTime, last30Days, monthly, consumptionTrend, tripCount: trips.length }
+    const currencies = Array.from(
+      new Set(trips.flatMap((t) => [...t.fuelStops.map((f) => f.currency), ...t.expenses.map((e) => e.currency)]))
+    )
+
+    return { allTime, last30Days, monthly, consumptionTrend, tripCount: trips.length, currencies }
   }
 
   /**
