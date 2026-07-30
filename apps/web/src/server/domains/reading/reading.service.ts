@@ -1,7 +1,8 @@
 import { TRPCError } from '@trpc/server'
+import { format } from 'date-fns'
 import { type ReadingRepository } from './reading.repository'
 import { type ItemRepository } from '@/server/domains/item/item.repository'
-import { getReadingMetrics } from './reading.fields'
+import { getReadingMetrics, type MetricOption } from './reading.fields'
 import { type ItemReading, type ItemType } from '@prisma/client'
 
 export interface MetricStats {
@@ -10,8 +11,15 @@ export interface MetricStats {
   unit: string
   healthyMin?: number
   healthyMax?: number
+  aggregation: 'latest' | 'sum'
+  chartType: 'line' | 'bar-monthly'
+  options?: MetricOption[]
+  showMonthToDate?: boolean
   latest: number | null
+  total: number
+  monthToDate: number | null
   trend: { date: Date; value: number }[]
+  monthly: { month: string; total: number }[]
 }
 
 export class ReadingService {
@@ -91,11 +99,23 @@ export class ReadingService {
 
     const metricDefs = getReadingMetrics(item.type) ?? []
     const readings = await this.readingRepo.findAllByItemId(itemId, userId)
+    const currentMonthKey = format(new Date(), 'yyyy-MM')
 
     const metrics: MetricStats[] = metricDefs.map((def) => {
       const trend = readings
         .map((r) => ({ date: r.recordedAt, value: (r.metrics as Record<string, number>)[def.key] }))
         .filter((p): p is { date: Date; value: number } => typeof p.value === 'number')
+
+      const monthlyMap = new Map<string, number>()
+      for (const p of trend) {
+        const key = format(p.date, 'yyyy-MM')
+        monthlyMap.set(key, (monthlyMap.get(key) ?? 0) + p.value)
+      }
+      const monthly = Array.from(monthlyMap.entries())
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([month, total]) => ({ month, total }))
+
+      const total = trend.reduce((sum, p) => sum + p.value, 0)
 
       return {
         key: def.key,
@@ -103,8 +123,15 @@ export class ReadingService {
         unit: def.unit,
         healthyMin: def.healthyMin,
         healthyMax: def.healthyMax,
+        aggregation: def.aggregation ?? 'latest',
+        chartType: def.chartType ?? 'line',
+        options: def.options,
+        showMonthToDate: def.showMonthToDate,
         latest: trend.length > 0 ? trend[trend.length - 1]!.value : null,
+        total,
+        monthToDate: monthlyMap.get(currentMonthKey) ?? null,
         trend,
+        monthly,
       }
     })
 
