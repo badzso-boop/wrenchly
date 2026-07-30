@@ -29,6 +29,7 @@ export const vehicleRouter = createTRPCRouter({
         currentOdometer: z.number().nonnegative().optional(),
         licensePlate: z.string().max(20).optional(),
         color: z.string().max(50).optional(),
+        fuelTankLiters: z.number().int().positive().optional(),
       })
     )
     .mutation(({ ctx, input }) => {
@@ -51,6 +52,7 @@ export const vehicleRouter = createTRPCRouter({
         engineDisplacement: z.number().int().nonnegative().optional(),
         licensePlate: z.string().max(20).optional(),
         color: z.string().max(50).optional(),
+        fuelTankLiters: z.number().int().positive().optional(),
       })
     )
     .mutation(({ ctx, input }) => {

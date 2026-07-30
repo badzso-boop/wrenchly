@@ -33,6 +33,7 @@ export class VehicleService {
       currentOdometer?: number | null
       licensePlate?: string | null
       color?: string | null
+      fuelTankLiters?: number | null
     }
   ): Promise<VehicleProfile> {
     await this.assertItemOwnership(input.itemId, userId)
@@ -59,6 +60,7 @@ export class VehicleService {
       engineDisplacement?: number | null
       licensePlate?: string | null
       color?: string | null
+      fuelTankLiters?: number | null
     }
   ): Promise<VehicleProfile> {
     await this.assertItemOwnership(itemId, userId)
