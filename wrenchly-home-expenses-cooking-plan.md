@@ -89,6 +89,7 @@ model HouseholdTransaction {
   currency    String                    @default("HUF")
   category    String?                   // csak EXPENSE-nél értelmezett, fix lista (lásd fent)
   paidBy      String                    // "Norbi" / "Dori" — egyelőre hardcode dropdown, l. lent
+  store       String?                   // bolt/hely, ahol a kiadás történt (pl. "Lidl", "Wolt")
   description String?
   occurredAt  DateTime
   createdAt   DateTime                  @default(now())
@@ -108,6 +109,12 @@ model HouseholdTransaction {
 foreign key — mert nem biztos, hogy mindkét névnek van/lesz saját wrenchly-fiókja). Ha ez
 egyszer bővülne (több névre, vagy tényleges user-referenciára), a `paidBy` mező free-text
 String marad, csak a frontend dropdown listája bővül — nem kell migráció.
+
+**"Bolt/hely" mező** (`store`): opcionális szabad szöveg (nem dropdown/lista MVP-ben, pl.
+"Lidl", "Wolt", "Auchan") — a `TripFuelStop.station` mezőjének mintájára. Egyelőre nincs
+hozzá saját statisztika a tervben (pl. "melyik boltban költünk a legtöbbet"), de mivel a mező
+maga olcsó hozzáadni, és később bármikor rá lehet építeni egy ilyen bontást is, érdemes most
+felvenni, hogy a régi rekordok is tudják kitölteni.
 
 ### `CookingLogEntry`
 
@@ -141,6 +148,38 @@ model CookingLogEntry {
 alapanyag-szintű statisztikát, csak kaja-szintűt, úgyhogy ez a legkisebb, még mindig hasznos
 megoldás. Ha valaha kell alapanyag-szintű bontás is, ez egy külön, rátehető réteg lehet, nem
 kell most beépíteni.
+
+**Bevásárlólista-integráció** (jóváhagyott kiegészítés): a wrenchly-ban már létezik egy
+`ShoppingListItem` modell (felhasználói szintű bevásárlólista, `PENDING`/`BOUGHT`/`CANCELLED`
+állapottal, opcionális `itemId` mezővel, amivel ma is köthető egy adott `Item`-hez). Ezt
+bővítjük egy új, opcionális `cookingLogEntryId` mezővel:
+
+```prisma
+model ShoppingListItem {
+  // ...meglévő mezők változatlanul...
+  cookingLogEntryId String?
+
+  cookingLogEntry CookingLogEntry? @relation(fields: [cookingLogEntryId], references: [id], onDelete: SetNull)
+}
+```
+
+Ezzel két irányban lehet használni, mindkettő **kézi, nem automatikus** párosítás (mivel az
+`ingredients` mező szabad szöveg, nincs mihez automatikusan illeszteni egy inventory-tételt):
+
+1. **Bevásárlástól a főzésig**: a bevásárlólistán meglévő (vagy `BOUGHT` státuszúra állított)
+   tételeket hozzá lehet rendelni egy `CookingLogEntry`-hez, jelezve, hogy "ezekből főztem" —
+   ez adja meg a kért "egymásra hivatkozás" lehetőséget a bevásárlás és a főzés között,
+   finomabb szemcsézettséggel, mint a `linkedTransactionId` (ami egy teljes kiadás-rekordot
+   köt össze, nem egyedi tételeket).
+2. **Főzéstől a bevásárlásig**: egy Főzés napló bejegyzésből (vagy egy Kedvenc kajából) egy
+   "Bevásárlólistára" gyorsgomb új `ShoppingListItem` sorokat hoz létre, `cookingLogEntryId`-vel
+   megjelölve — a user kézzel írja be a hiányzó alapanyagokat (nincs automatikus
+   ingredient-parsing/matching az `InventoryItem` készlethez, mert az MVP `ingredients` mezője
+   nem strukturált; ez egy tudatos, jövőre hagyott mélyebb integráció lenne).
+
+Az `InventoryItem` (raktárkészlet) automatikus fogyás-követése (pl. "ezt a főzést levontuk a
+készletből") **szándékosan nincs ebben a körben** — ahhoz strukturált, mennyiséggel ellátott
+alapanyag-lista kellene, ami ellentmondana a fenti, tudatosan szabad-szöveges MVP-döntésnek.
 
 ### `FavoriteMeal`
 
@@ -198,10 +237,12 @@ Statisztika tab-mintájának megfelelően):
 - **Otthon Profil** — a minimális `HomeProfile` mezők (`householdSize`, `notes`).
 - **Kiadások és Bevételek** — lista + form a `HouseholdTransaction` rekordokhoz, típus
   (kiadás/bevétel) váltóval, kategória-dropdown (csak kiadásnál), "Ki" dropdown (Norbi/Dori),
-  összeg, dátum, megjegyzés.
+  bolt/hely mező (csak kiadásnál), összeg, dátum, megjegyzés.
 - **Főzés napló** — lista + form a `CookingLogEntry`-khez, a fuzzy-match megerősítő
   dialógussal, opcionális kapcsolattal egy kiadáshoz (dropdown a Home elem GROCERY-kategóriájú
-  kiadásaiból).
+  kiadásaiból), és opcionális bevásárlólista-tétel(ek) hozzárendelésével ("ezekből főztem" —
+  lásd az adatmodell résznél), plusz egy "Bevásárlólistára" gyorsgomb, ami hiányzó
+  alapanyagokat vesz fel új `ShoppingListItem`-ként.
 - **Kedvenc kajék** — egyszerű CRUD lista.
 - **Statisztika** — lásd lent.
 
@@ -246,6 +287,10 @@ más típusokra is) mintáját követve, saját, függőség nélküli SVG chart
 - [ ] CRUD végpontok + a fuzzy-match ellenőrzés a `create`-ben (`forceNew` flag-gel
       megkerülhető)
 - [ ] opcionális kapcsolat egy `HouseholdTransaction`-höz
+- [ ] `ShoppingListItem.cookingLogEntryId` kezelése: tételek hozzárendelése egy meglévő
+      `CookingLogEntry`-hez, és egy "hozz létre bevásárlólista-tételeket ehhez a
+      recepthez" végpont (a `shopping-list`/`inventory` domain meglévő
+      create-mutation-jét hívja, csak `cookingLogEntryId`-vel kiegészítve)
 - [ ] unit tesztek (kifejezetten a fuzzy-match határeseteire: pontos egyezés, ékezet/rag
       eltérés, teljesen más név)
 
@@ -264,13 +309,15 @@ más típusokra is) mintáját követve, saját, függőség nélküli SVG chart
 
 ### 7. Frontend — Kiadások és Bevételek tab
 - [ ] lista komponens (szűrés hónap szerint, típus szerint)
-- [ ] form komponens (típus/kategória/összeg/"Ki" dropdown/dátum/megjegyzés)
+- [ ] form komponens (típus/kategória/összeg/"Ki" dropdown/bolt-hely mező/dátum/megjegyzés)
 - [ ] szerkesztés/törlés
 
 ### 8. Frontend — Főzés napló tab
 - [ ] lista komponens
 - [ ] form komponens + fuzzy-match megerősítő dialógus UX
 - [ ] opcionális kiadás-kapcsolat választó
+- [ ] opcionális bevásárlólista-tétel(ek) hozzárendelése ("ezekből főztem") + "Bevásárlólistára"
+      gyorsgomb, ami új `ShoppingListItem` sorokat hoz létre `cookingLogEntryId`-vel
 
 ### 9. Frontend — Kedvenc kajék tab
 - [ ] lista + hozzáadás/szerkesztés/törlés
@@ -295,3 +342,10 @@ más típusokra is) mintáját követve, saját, függőség nélküli SVG chart
 - `paidBy` valódi user-referenciává alakítása (marad free-text dropdown).
 - Élő autocomplete a kaja-nevekhez (csak beküldéskori fuzzy-check, a döntés szerint).
 - PROPERTY-típus bármilyen módosítása — a HOME teljesen független, új típus.
+- `InventoryItem` (raktárkészlet) automatikus fogyás-követése főzéskor (strukturált
+  alapanyag-mennyiség kellene hozzá, ami ellentmond a szabad-szöveges MVP-döntésnek).
+- **Megosztott hozzáférés / collaborator-mechanizmus a Home elemhez** (hogy Dori is be tudjon
+  jelentkezni és saját maga rögzítsen kiadást, ne csak egy név legyen a "Ki" dropdownban) —
+  jó ötlet, de **ez nem ehhez a funkcióhoz kötött, hanem egy általánosabb, a teljes appot
+  érintő kérdés** (bármelyik Item-et érintheti, nem csak a Home-ot), ezért külön, saját
+  tervezést igénylő PR-ként kezelendő, nem ennek a körnek a része.
