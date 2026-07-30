@@ -84,7 +84,7 @@ export function ItemDetailClient({ itemId }: { itemId: string }) {
         </div>
 
         {/* Tab nav */}
-        <nav className="flex gap-1 mt-3 -mb-4 -mx-0">
+        <nav className="flex gap-1 mt-3 -mb-4 -mx-0 overflow-x-auto">
           {tabs.map((tab) => {
             const isActive = pathname === tab.href
             return (
@@ -92,7 +92,7 @@ export function ItemDetailClient({ itemId }: { itemId: string }) {
                 key={tab.href}
                 href={tab.href}
                 className={cn(
-                  'flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-all duration-150',
+                  'flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-all duration-150 shrink-0',
                   isActive
                     ? 'border-primary text-primary'
                     : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
