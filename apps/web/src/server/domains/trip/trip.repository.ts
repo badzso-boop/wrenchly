@@ -48,6 +48,10 @@ export class TripRepository {
     totalFuelQty: number
     totalFuelCost: number
     totalExpenseCost: number
+    durationMin?: number | null
+    elevationGainM?: number | null
+    batteryPercentUsed?: number | null
+    maxAltitudeM?: number | null
     fuelStops?: Array<{
       quantity: number
       unit: string
@@ -88,6 +92,10 @@ export class TripRepository {
       totalFuelQty?: number
       totalFuelCost?: number
       totalExpenseCost?: number
+      durationMin?: number | null
+      elevationGainM?: number | null
+      batteryPercentUsed?: number | null
+      maxAltitudeM?: number | null
       fuelStops?: Array<{
         quantity: number
         unit: string
