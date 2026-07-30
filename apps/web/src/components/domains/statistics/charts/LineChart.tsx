@@ -31,12 +31,20 @@ export function LineChart({
   healthyMin,
   healthyMax,
   valueFormatter = (n) => n.toFixed(1),
+  pointColorClass,
+  valueLabel,
 }: {
   points: LineChartPoint[]
   unitLabel: string
   healthyMin?: number
   healthyMax?: number
   valueFormatter?: (n: number) => string
+  /** Colors each point (and the tooltip's swatch) by its own value instead of the default
+   * chart-1 — e.g. a plant's health-status timeline (green/yellow/orange/red per point). */
+  pointColorClass?: (value: number) => string
+  /** Overrides the tooltip's value text (e.g. "Healthy" instead of "4") — the axis/line still
+   * plots the raw numeric value. */
+  valueLabel?: (value: number) => string
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [active, setActive] = useState<ActiveState | null>(null)
@@ -149,7 +157,7 @@ export function LineChart({
                 cx={c.x}
                 cy={c.y}
                 r={isActive ? 5.5 : 4}
-                className="fill-chart-1"
+                className={pointColorClass ? pointColorClass(c.point.value) : 'fill-chart-1'}
                 stroke="var(--background)"
                 strokeWidth={2}
               />
@@ -170,8 +178,16 @@ export function LineChart({
         >
           <div className="mb-0.5 font-medium">{new Date(activeCoord.point.date).toLocaleDateString()}</div>
           <div className="flex items-center gap-1.5">
-            <span className="inline-block h-1.5 w-3 rounded-sm bg-chart-1" />
-            <span className="font-semibold tabular-nums">{valueFormatter(activeCoord.point.value)} {unitLabel}</span>
+            {/* Reuses the same fill-* class as the chart points (not a bg-* div) — the class
+               string only ever appears literally as "fill-*" in reading.fields.ts, so Tailwind's
+               scanner can see it; a runtime fill->bg string replace would silently produce an
+               un-styled class since "bg-chart-2" etc. never appears as source text anywhere. */}
+            <svg className="h-3 w-3 shrink-0" viewBox="0 0 8 8" aria-hidden="true">
+              <circle cx={4} cy={4} r={4} className={pointColorClass ? pointColorClass(activeCoord.point.value) : 'fill-chart-1'} />
+            </svg>
+            <span className="font-semibold tabular-nums">
+              {valueLabel ? valueLabel(activeCoord.point.value) : `${valueFormatter(activeCoord.point.value)} ${unitLabel}`}
+            </span>
           </div>
         </div>
       )}

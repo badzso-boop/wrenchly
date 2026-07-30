@@ -3,12 +3,12 @@ import { api } from '@/lib/trpc/client'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { DateField } from '@/components/ui/date-field'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { getReadingMetrics } from '@/server/domains/reading/reading.fields'
+import { MetricField } from './MetricField'
 import type { ItemType } from '@prisma/client'
 
 export function AddReadingForm({
@@ -58,17 +58,13 @@ export function AddReadingForm({
 
           <div className={metrics.length > 1 ? 'grid grid-cols-2 gap-3' : 'grid grid-cols-1 gap-3'}>
             {metrics.map((m) => (
-              <div key={m.key} className="space-y-2">
-                <Label htmlFor={`metric-${m.key}`}>{m.label} ({m.unit})</Label>
-                <Input
-                  id={`metric-${m.key}`}
-                  type="number"
-                  step="any"
-                  value={values[m.key] ?? ''}
-                  onChange={(e) => setValues((v) => ({ ...v, [m.key]: (e.target as HTMLInputElement).value }))}
-                  placeholder={m.unit}
-                />
-              </div>
+              <MetricField
+                key={m.key}
+                metric={m}
+                idPrefix="metric"
+                value={values[m.key] ?? ''}
+                onChange={(v) => setValues((prev) => ({ ...prev, [m.key]: v }))}
+              />
             ))}
           </div>
 

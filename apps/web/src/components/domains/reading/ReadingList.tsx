@@ -4,12 +4,12 @@ import { Trash2, ChevronDown, ChevronUp, Pencil } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { DateField } from '@/components/ui/date-field'
 import { Card, CardContent } from '@/components/ui/card'
 import { getReadingMetrics } from '@/server/domains/reading/reading.fields'
+import { MetricField } from './MetricField'
 import type { ItemReading, ItemType } from '@prisma/client'
 
 function EditReadingForm({
@@ -63,16 +63,13 @@ function EditReadingForm({
 
       <div className={metrics.length > 1 ? 'grid grid-cols-2 gap-3' : 'grid grid-cols-1 gap-3'}>
         {metrics.map((m) => (
-          <div key={m.key} className="space-y-1.5">
-            <Label htmlFor={`edit-metric-${reading.id}-${m.key}`}>{m.label} ({m.unit})</Label>
-            <Input
-              id={`edit-metric-${reading.id}-${m.key}`}
-              type="number"
-              step="any"
-              value={values[m.key] ?? ''}
-              onChange={(e) => setValues((v) => ({ ...v, [m.key]: (e.target as HTMLInputElement).value }))}
-            />
-          </div>
+          <MetricField
+            key={m.key}
+            metric={m}
+            idPrefix={`edit-metric-${reading.id}`}
+            value={values[m.key] ?? ''}
+            onChange={(v) => setValues((prev) => ({ ...prev, [m.key]: v }))}
+          />
         ))}
       </div>
 
@@ -122,7 +119,10 @@ export function ReadingList({ readings, itemType }: { readings: ItemReading[]; i
         const values = reading.metrics as Record<string, number>
         const summary = metrics
           .filter((m) => typeof values[m.key] === 'number')
-          .map((m) => `${values[m.key]} ${m.unit}`)
+          .map((m) => {
+            const option = m.options?.find((o) => o.value === values[m.key])
+            return option ? `${m.label}: ${option.label}` : `${values[m.key]} ${m.unit}`
+          })
           .join(' · ')
 
         return (
