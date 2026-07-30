@@ -62,7 +62,7 @@ describe('ReadingService.create', () => {
   })
 
   it('rejects every submitted metric key for an item type with no registered metrics', async () => {
-    mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1', type: 'MACHINE' })
+    mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1', type: 'CUSTOM' })
 
     await expect(
       service.create('user-1', { itemId: 'item-1', recordedAt: new Date(), metrics: { weightKg: 4 } })
@@ -147,11 +147,80 @@ describe('ReadingService.getStatistics', () => {
   })
 
   it('returns an empty metrics list for an item type with no registered metrics', async () => {
-    mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1', type: 'MACHINE' })
+    mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1', type: 'CUSTOM' })
     mockReadingRepo.findAllByItemId.mockResolvedValue([])
 
     const stats = await service.getStatistics('item-1', 'user-1')
 
     expect(stats.metrics).toEqual([])
+  })
+
+  it('sums a "sum"-aggregated metric across all readings and buckets it by month (MACHINE)', async () => {
+    mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1', type: 'MACHINE' })
+    mockReadingRepo.findAllByItemId.mockResolvedValue([
+      { recordedAt: new Date('2026-01-05'), metrics: { operatingHours: 3, cyclesRun: 10 } },
+      { recordedAt: new Date('2026-01-20'), metrics: { operatingHours: 2 } },
+      { recordedAt: new Date('2026-02-10'), metrics: { operatingHours: 4, cyclesRun: 5 } },
+    ])
+
+    const stats = await service.getStatistics('item-1', 'user-1')
+
+    const hours = stats.metrics.find((m) => m.key === 'operatingHours')
+    expect(hours?.aggregation).toBe('sum')
+    expect(hours?.chartType).toBe('bar-monthly')
+    expect(hours?.total).toBe(9)
+    expect(hours?.monthly).toEqual([
+      { month: '2026-01', total: 5 },
+      { month: '2026-02', total: 4 },
+    ])
+
+    const cycles = stats.metrics.find((m) => m.key === 'cyclesRun')
+    expect(cycles?.total).toBe(15)
+  })
+
+  it('computes monthToDate as null when no reading exists in the current month', async () => {
+    mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1', type: 'MACHINE' })
+    mockReadingRepo.findAllByItemId.mockResolvedValue([
+      { recordedAt: new Date('2020-01-05'), metrics: { operatingHours: 3 } },
+    ])
+
+    const stats = await service.getStatistics('item-1', 'user-1')
+
+    expect(stats.metrics.find((m) => m.key === 'operatingHours')?.monthToDate).toBeNull()
+  })
+
+  it('passes through select-style metric options unchanged (PLANT healthScore)', async () => {
+    mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1', type: 'PLANT' })
+    mockReadingRepo.findAllByItemId.mockResolvedValue([
+      { recordedAt: new Date('2026-01-01'), metrics: { healthScore: 4 } },
+    ])
+
+    const stats = await service.getStatistics('item-1', 'user-1')
+
+    const health = stats.metrics.find((m) => m.key === 'healthScore')
+    expect(health?.aggregation).toBe('latest')
+    expect(health?.options).toEqual([
+      { value: 4, label: 'Healthy', colorClass: 'fill-chart-2' },
+      { value: 3, label: 'Stressed', colorClass: 'fill-chart-3' },
+      { value: 2, label: 'Sick', colorClass: 'fill-chart-4' },
+      { value: 1, label: 'Dead', colorClass: 'fill-destructive' },
+    ])
+    expect(health?.latest).toBe(4)
+  })
+
+  it('accepts a valid AQUARIUM multi-parameter reading and rejects an unrelated key', async () => {
+    mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1', type: 'AQUARIUM' })
+    mockReadingRepo.create.mockResolvedValue({ id: 'reading-1' })
+
+    await service.create('user-1', {
+      itemId: 'item-1',
+      recordedAt: new Date(),
+      metrics: { ph: 7.0, ammoniaPpm: 0.1, nitritePpm: 0, nitratePpm: 10, tempC: 25 },
+    })
+    expect(mockReadingRepo.create).toHaveBeenCalled()
+
+    await expect(
+      service.create('user-1', { itemId: 'item-1', recordedAt: new Date(), metrics: { freeChlorinePpm: 2 } })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' })
   })
 })
