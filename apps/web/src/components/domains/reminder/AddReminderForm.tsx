@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { DateField } from '@/components/ui/date-field'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
@@ -75,7 +76,7 @@ export function AddReminderForm({ itemId, onSuccess }: { itemId: string; onSucce
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label htmlFor="date">Date *</Label>
-                <Input id="date" type="date" value={date} onChange={(e) => setDate((e.target as HTMLInputElement).value)} required />
+                <DateField id="date" value={date} onChange={setDate} required />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="time">Time</Label>

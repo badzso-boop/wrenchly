@@ -7,6 +7,7 @@ import { ItemStatus } from '@prisma/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { DateField } from '@/components/ui/date-field'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -91,7 +92,7 @@ export function EditItemClient({ itemId }: { itemId: string }) {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
                     <Label htmlFor="purchaseDate">Purchase Date</Label>
-                    <Input id="purchaseDate" type="date" value={purchaseDate} onChange={(e) => setPurchaseDate((e.target as HTMLInputElement).value)} />
+                    <DateField id="purchaseDate" value={purchaseDate} onChange={setPurchaseDate} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="purchasePrice">Purchase Price</Label>
