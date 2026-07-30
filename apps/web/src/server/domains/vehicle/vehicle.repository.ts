@@ -1,5 +1,19 @@
 import { type PrismaClient, type VehicleProfile } from '@prisma/client'
 
+interface ExtendedVehicleFields {
+  variant?: string | null
+  powerKw?: number | null
+  transmission?: string | null
+  driveType?: string | null
+  oilSpec?: string | null
+  coolantType?: string | null
+  brakeFluidType?: string | null
+  tireSizeFront?: string | null
+  tireSizeRear?: string | null
+  tirePressureFront?: number | null
+  tirePressureRear?: number | null
+}
+
 export class VehicleRepository {
   constructor(private db: PrismaClient) {}
 
@@ -19,7 +33,7 @@ export class VehicleRepository {
     licensePlate?: string | null
     color?: string | null
     fuelTankLiters?: number | null
-  }): Promise<VehicleProfile> {
+  } & ExtendedVehicleFields): Promise<VehicleProfile> {
     return this.db.vehicleProfile.create({ data })
   }
 
@@ -35,7 +49,7 @@ export class VehicleRepository {
       licensePlate?: string | null
       color?: string | null
       fuelTankLiters?: number | null
-    }
+    } & ExtendedVehicleFields
   ): Promise<VehicleProfile> {
     return this.db.vehicleProfile.update({ where: { itemId }, data })
   }

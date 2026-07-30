@@ -18,7 +18,12 @@ export function VehicleProfileClient({ itemId }: { itemId: string }) {
   const [editing, setEditing] = useState(false)
   const [showOdoForm, setShowOdoForm] = useState(false)
   const [newOdometer, setNewOdometer] = useState('')
-  const [form, setForm] = useState({ make: '', model: '', year: '', vin: '', fuelType: '', engineDisplacement: '', licensePlate: '', color: '', fuelTankLiters: '' })
+  const emptyForm = {
+    make: '', model: '', year: '', vin: '', fuelType: '', engineDisplacement: '', licensePlate: '', color: '', fuelTankLiters: '',
+    variant: '', powerKw: '', transmission: '', driveType: '', oilSpec: '', coolantType: '', brakeFluidType: '',
+    tireSizeFront: '', tireSizeRear: '', tirePressureFront: '', tirePressureRear: '',
+  }
+  const [form, setForm] = useState(emptyForm)
 
   const create = api.vehicle.create.useMutation({
     onSuccess: () => { profile.refetch(); setEditing(false); toast.success('Vehicle profile created') },
@@ -32,11 +37,15 @@ export function VehicleProfileClient({ itemId }: { itemId: string }) {
 
   function openEdit(forNew: boolean) {
     const p = profile.data
-    setForm(forNew || !p ? { make: '', model: '', year: '', vin: '', fuelType: '', engineDisplacement: '', licensePlate: '', color: '', fuelTankLiters: '' } : {
+    setForm(forNew || !p ? emptyForm : {
       make: p.make, model: p.model, year: p.year?.toString() ?? '', vin: p.vin ?? '',
       fuelType: p.fuelType ?? '', engineDisplacement: p.engineDisplacement?.toString() ?? '',
       licensePlate: p.licensePlate ?? '', color: p.color ?? '',
       fuelTankLiters: p.fuelTankLiters?.toString() ?? '',
+      variant: p.variant ?? '', powerKw: p.powerKw?.toString() ?? '', transmission: p.transmission ?? '',
+      driveType: p.driveType ?? '', oilSpec: p.oilSpec ?? '', coolantType: p.coolantType ?? '',
+      brakeFluidType: p.brakeFluidType ?? '', tireSizeFront: p.tireSizeFront ?? '', tireSizeRear: p.tireSizeRear ?? '',
+      tirePressureFront: p.tirePressureFront?.toString() ?? '', tirePressureRear: p.tirePressureRear?.toString() ?? '',
     })
     setEditing(true)
   }
@@ -52,6 +61,17 @@ export function VehicleProfileClient({ itemId }: { itemId: string }) {
       licensePlate: form.licensePlate || undefined,
       color: form.color || undefined,
       fuelTankLiters: form.fuelTankLiters ? Number(form.fuelTankLiters) : undefined,
+      variant: form.variant || undefined,
+      powerKw: form.powerKw ? Number(form.powerKw) : undefined,
+      transmission: form.transmission || undefined,
+      driveType: form.driveType || undefined,
+      oilSpec: form.oilSpec || undefined,
+      coolantType: form.coolantType || undefined,
+      brakeFluidType: form.brakeFluidType || undefined,
+      tireSizeFront: form.tireSizeFront || undefined,
+      tireSizeRear: form.tireSizeRear || undefined,
+      tirePressureFront: form.tirePressureFront ? Number(form.tirePressureFront) : undefined,
+      tirePressureRear: form.tirePressureRear ? Number(form.tirePressureRear) : undefined,
     }
     if (profile.data) update.mutate({ itemId, ...data })
     else create.mutate({ itemId, ...data })
@@ -74,7 +94,26 @@ export function VehicleProfileClient({ itemId }: { itemId: string }) {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
-                {([['Make', p.make], ['Model', p.model], p.year && ['Year', String(p.year)], p.fuelType && ['Fuel', p.fuelType], p.engineDisplacement && ['Engine (cc)', String(p.engineDisplacement)], p.licensePlate && ['Plate', p.licensePlate], p.color && ['Color', p.color], p.fuelTankLiters && ['Tank size', `${p.fuelTankLiters} L`]].filter(Boolean) as string[][]).map(([label, value]) => (
+                {([
+                  ['Make', p.make], ['Model', p.model],
+                  p.variant && ['Variant', p.variant],
+                  p.year && ['Year', String(p.year)],
+                  p.fuelType && ['Fuel', p.fuelType],
+                  p.engineDisplacement && ['Engine (cc)', String(p.engineDisplacement)],
+                  p.powerKw && ['Power (kW)', String(p.powerKw)],
+                  p.transmission && ['Transmission', p.transmission],
+                  p.driveType && ['Drive', p.driveType],
+                  p.licensePlate && ['Plate', p.licensePlate],
+                  p.color && ['Color', p.color],
+                  p.fuelTankLiters && ['Tank size', `${p.fuelTankLiters} L`],
+                  p.oilSpec && ['Oil spec', p.oilSpec],
+                  p.coolantType && ['Coolant', p.coolantType],
+                  p.brakeFluidType && ['Brake fluid', p.brakeFluidType],
+                  p.tireSizeFront && ['Tire (front)', p.tireSizeFront],
+                  p.tireSizeRear && ['Tire (rear)', p.tireSizeRear],
+                  p.tirePressureFront && ['Tire pressure (front)', `${p.tirePressureFront} bar`],
+                  p.tirePressureRear && ['Tire pressure (rear)', `${p.tirePressureRear} bar`],
+                ].filter(Boolean) as string[][]).map(([label, value]) => (
                   <div key={label}>
                     <p className="text-muted-foreground text-xs mb-0.5">{label}</p>
                     <p className="font-medium">{value}</p>
@@ -200,9 +239,65 @@ export function VehicleProfileClient({ itemId }: { itemId: string }) {
                   <Input id="vin" value={form.vin} onChange={(e) => setForm((f) => ({ ...f, vin: (e.target as HTMLInputElement).value.toUpperCase() }))} maxLength={17} pattern="[A-HJ-NPR-Z0-9]{17}" placeholder="Optional" className="font-mono" />
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="tank">Fuel tank size (liters)</Label>
-                <Input id="tank" type="number" value={form.fuelTankLiters} onChange={set('fuelTankLiters')} min="0" placeholder="e.g. 55" />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="tank">Fuel tank size (liters)</Label>
+                  <Input id="tank" type="number" value={form.fuelTankLiters} onChange={set('fuelTankLiters')} min="0" placeholder="e.g. 55" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="variant">Variant</Label>
+                  <Input id="variant" value={form.variant} onChange={set('variant')} placeholder="e.g. Carrera S" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="powerKw">Power (kW)</Label>
+                  <Input id="powerKw" type="number" value={form.powerKw} onChange={set('powerKw')} min="0" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="transmission">Transmission</Label>
+                  <Input id="transmission" value={form.transmission} onChange={set('transmission')} placeholder="e.g. 8-speed PDK" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="driveType">Drive type</Label>
+                  <Input id="driveType" value={form.driveType} onChange={set('driveType')} placeholder="e.g. RWD" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="oilSpec">Oil spec</Label>
+                  <Input id="oilSpec" value={form.oilSpec} onChange={set('oilSpec')} placeholder="e.g. 0W-40" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="coolantType">Coolant type</Label>
+                  <Input id="coolantType" value={form.coolantType} onChange={set('coolantType')} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="brakeFluidType">Brake fluid type</Label>
+                  <Input id="brakeFluidType" value={form.brakeFluidType} onChange={set('brakeFluidType')} placeholder="e.g. DOT 4" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="tireSizeFront">Tire size (front)</Label>
+                  <Input id="tireSizeFront" value={form.tireSizeFront} onChange={set('tireSizeFront')} placeholder="e.g. 245/35 R20" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="tireSizeRear">Tire size (rear)</Label>
+                  <Input id="tireSizeRear" value={form.tireSizeRear} onChange={set('tireSizeRear')} placeholder="e.g. 305/30 R21" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="tirePressureFront">Tire pressure front (bar)</Label>
+                  <Input id="tirePressureFront" type="number" step="0.1" value={form.tirePressureFront} onChange={set('tirePressureFront')} min="0" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="tirePressureRear">Tire pressure rear (bar)</Label>
+                  <Input id="tirePressureRear" type="number" step="0.1" value={form.tirePressureRear} onChange={set('tirePressureRear')} min="0" />
+                </div>
               </div>
               {(create.error ?? update.error) && (
                 <p className="text-sm text-destructive">{(create.error ?? update.error)?.message}</p>

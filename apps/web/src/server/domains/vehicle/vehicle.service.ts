@@ -7,6 +7,20 @@ import { type PrismaClient, type VehicleProfile } from '@prisma/client'
 
 const VIN_REGEX = /^[A-HJ-NPR-Z0-9]{17}$/
 
+interface ExtendedVehicleFields {
+  variant?: string | null
+  powerKw?: number | null
+  transmission?: string | null
+  driveType?: string | null
+  oilSpec?: string | null
+  coolantType?: string | null
+  brakeFluidType?: string | null
+  tireSizeFront?: string | null
+  tireSizeRear?: string | null
+  tirePressureFront?: number | null
+  tirePressureRear?: number | null
+}
+
 export class VehicleService {
   constructor(
     private vehicleRepo: VehicleRepository,
@@ -34,7 +48,7 @@ export class VehicleService {
       licensePlate?: string | null
       color?: string | null
       fuelTankLiters?: number | null
-    }
+    } & ExtendedVehicleFields
   ): Promise<VehicleProfile> {
     await this.assertItemOwnership(input.itemId, userId)
 
@@ -61,7 +75,7 @@ export class VehicleService {
       licensePlate?: string | null
       color?: string | null
       fuelTankLiters?: number | null
-    }
+    } & ExtendedVehicleFields
   ): Promise<VehicleProfile> {
     await this.assertItemOwnership(itemId, userId)
 
