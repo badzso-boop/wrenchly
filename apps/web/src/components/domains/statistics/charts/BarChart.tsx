@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 
 interface BarSeries {
   key: string
@@ -10,6 +10,12 @@ interface BarSeries {
 interface BarDatum {
   label: string
   values: Record<string, number>
+}
+
+interface ActiveState {
+  index: number
+  x: number
+  y: number
 }
 
 function niceMax(max: number): number {
@@ -33,7 +39,8 @@ export function BarChart({
   series: BarSeries[]
   valueFormatter?: (n: number) => string
 }) {
-  const [activeIndex, setActiveIndex] = useState<number | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [active, setActive] = useState<ActiveState | null>(null)
 
   const W = 300
   const H = 160
@@ -58,14 +65,35 @@ export function BarChart({
     return <p className="text-sm text-muted-foreground py-8 text-center">Not enough data yet.</p>
   }
 
-  const active = activeIndex != null ? data[activeIndex] : undefined
-  const tooltipLeft = activeIndex != null
-    ? Math.min(92, Math.max(8, ((PAD_LEFT + activeIndex * slotW + slotW / 2) / W) * 100))
-    : 0
+  // Position the tooltip at the actual pointer position (relative to the chart container),
+  // rather than deriving it from the SVG's own viewBox math — the <svg> uses default
+  // preserveAspectRatio, so it letterboxes (centers with side-margins) whenever the container's
+  // aspect ratio doesn't match the viewBox's, which made a viewBox-based estimate drift off the
+  // real bar position.
+  function pointerPosition(e: React.MouseEvent): { x: number; y: number } | null {
+    const rect = containerRef.current?.getBoundingClientRect()
+    if (!rect) return null
+    return { x: Math.min(rect.width - 8, Math.max(8, e.clientX - rect.left)), y: e.clientY - rect.top }
+  }
+
+  function trackPointer(i: number, e: React.MouseEvent) {
+    const pos = pointerPosition(e)
+    if (pos) setActive({ index: i, ...pos })
+  }
+
+  function toggleActive(i: number, e: React.MouseEvent) {
+    setActive((prev) => {
+      if (prev?.index === i) return null
+      const pos = pointerPosition(e)
+      return pos ? { index: i, ...pos } : prev
+    })
+  }
+
+  const activeDatum = active ? data[active.index] : undefined
 
   return (
     <div>
-      <div className="relative">
+      <div ref={containerRef} className="relative">
         <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-40" role="img" aria-label="Bar chart">
           {gridSteps.map((v, i) => {
             const y = PAD_TOP + plotH - (v / max) * plotH
@@ -81,15 +109,16 @@ export function BarChart({
 
           {data.map((d, i) => {
             const x = PAD_LEFT + i * slotW + (slotW - barW) / 2
-            const isActive = activeIndex === i
+            const isActive = active?.index === i
             let yCursor = PAD_TOP + plotH
             return (
               <g
                 key={d.label}
                 className="cursor-pointer"
-                onMouseEnter={() => setActiveIndex(i)}
-                onMouseLeave={() => setActiveIndex((prev) => (prev === i ? null : prev))}
-                onClick={() => setActiveIndex((prev) => (prev === i ? null : i))}
+                onMouseEnter={(e) => trackPointer(i, e)}
+                onMouseMove={(e) => trackPointer(i, e)}
+                onMouseLeave={() => setActive((prev) => (prev?.index === i ? null : prev))}
+                onClick={(e) => toggleActive(i, e)}
               >
                 {/* Invisible full-column hit target — bigger than the bar itself, easy to tap on mobile. */}
                 <rect x={PAD_LEFT + i * slotW} y={PAD_TOP} width={slotW} height={plotH} fill="transparent" pointerEvents="all" />
@@ -122,17 +151,17 @@ export function BarChart({
           })}
         </svg>
 
-        {active && (
+        {active && activeDatum && (
           <div
-            className="pointer-events-none absolute top-1 -translate-x-1/2 whitespace-nowrap rounded-md border bg-popover px-2 py-1.5 text-xs text-popover-foreground shadow-md z-10"
-            style={{ left: `${tooltipLeft}%` }}
+            className="pointer-events-none absolute whitespace-nowrap rounded-md border bg-popover px-2 py-1.5 text-xs text-popover-foreground shadow-md z-10"
+            style={{ left: active.x, top: active.y, transform: 'translate(-50%, calc(-100% - 10px))' }}
           >
-            <div className="mb-0.5 font-medium">{active.label}</div>
+            <div className="mb-0.5 font-medium">{activeDatum.label}</div>
             {series.map((s) => (
               <div key={s.key} className="flex items-center gap-1.5">
                 <span className={`inline-block h-1.5 w-3 rounded-sm ${s.colorClass}`} />
                 <span className="text-muted-foreground">{s.label}:</span>
-                <span className="font-semibold tabular-nums">{valueFormatter(active.values[s.key] ?? 0)}</span>
+                <span className="font-semibold tabular-nums">{valueFormatter(activeDatum.values[s.key] ?? 0)}</span>
               </div>
             ))}
           </div>

@@ -1,9 +1,15 @@
 'use client'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 
 interface TrendPoint {
   date: Date | string
   consumption: number
+}
+
+interface ActiveState {
+  index: number
+  x: number
+  y: number
 }
 
 function niceMax(max: number): number {
@@ -16,7 +22,8 @@ function niceMax(max: number): number {
 
 /** Single-series line chart — per-trip fuel consumption (L/100km) over time. */
 export function ConsumptionTrendChart({ points }: { points: TrendPoint[] }) {
-  const [activeIndex, setActiveIndex] = useState<number | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [active, setActive] = useState<ActiveState | null>(null)
 
   if (points.length === 0) {
     return <p className="text-sm text-muted-foreground py-8 text-center">Not enough fuel data yet.</p>
@@ -45,11 +52,34 @@ export function ConsumptionTrendChart({ points }: { points: TrendPoint[] }) {
 
   const labelStride = coords.length > 8 ? Math.ceil(coords.length / 6) : 1
 
-  const active = activeIndex != null ? coords[activeIndex] : undefined
-  const tooltipLeft = active ? Math.min(92, Math.max(8, (active.x / W) * 100)) : 0
+  // Position the tooltip at the actual pointer position (relative to the chart container),
+  // rather than deriving it from the SVG's own viewBox math — the <svg> uses default
+  // preserveAspectRatio, so it letterboxes (centers with side-margins) whenever the container's
+  // aspect ratio doesn't match the viewBox's, which made a viewBox-based estimate drift off the
+  // real point position.
+  function pointerPosition(e: React.MouseEvent): { x: number; y: number } | null {
+    const rect = containerRef.current?.getBoundingClientRect()
+    if (!rect) return null
+    return { x: Math.min(rect.width - 8, Math.max(8, e.clientX - rect.left)), y: e.clientY - rect.top }
+  }
+
+  function trackPointer(i: number, e: React.MouseEvent) {
+    const pos = pointerPosition(e)
+    if (pos) setActive({ index: i, ...pos })
+  }
+
+  function toggleActive(i: number, e: React.MouseEvent) {
+    setActive((prev) => {
+      if (prev?.index === i) return null
+      const pos = pointerPosition(e)
+      return pos ? { index: i, ...pos } : prev
+    })
+  }
+
+  const activeCoord = active ? coords[active.index] : undefined
 
   return (
-    <div className="relative">
+    <div ref={containerRef} className="relative">
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-40" role="img" aria-label="Consumption trend chart">
         {gridSteps.map((v, i) => {
           const y = PAD_TOP + plotH - (v / max) * plotH
@@ -66,14 +96,15 @@ export function ConsumptionTrendChart({ points }: { points: TrendPoint[] }) {
         <path d={path} className="stroke-chart-1" fill="none" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
 
         {coords.map((c, i) => {
-          const isActive = activeIndex === i
+          const isActive = active?.index === i
           return (
             <g
               key={i}
               className="cursor-pointer"
-              onMouseEnter={() => setActiveIndex(i)}
-              onMouseLeave={() => setActiveIndex((prev) => (prev === i ? null : prev))}
-              onClick={() => setActiveIndex((prev) => (prev === i ? null : i))}
+              onMouseEnter={(e) => trackPointer(i, e)}
+              onMouseMove={(e) => trackPointer(i, e)}
+              onMouseLeave={() => setActive((prev) => (prev?.index === i ? null : prev))}
+              onClick={(e) => toggleActive(i, e)}
             >
               {/* Invisible, generously-sized hit target — much bigger than the visible dot, easy to tap. */}
               <circle cx={c.x} cy={c.y} r={14} fill="transparent" pointerEvents="all" />
@@ -95,16 +126,16 @@ export function ConsumptionTrendChart({ points }: { points: TrendPoint[] }) {
         })}
       </svg>
 
-      {active && (
+      {active && activeCoord && (
         <div
-          className="pointer-events-none absolute top-1 -translate-x-1/2 whitespace-nowrap rounded-md border bg-popover px-2 py-1.5 text-xs text-popover-foreground shadow-md z-10"
-          style={{ left: `${tooltipLeft}%` }}
+          className="pointer-events-none absolute whitespace-nowrap rounded-md border bg-popover px-2 py-1.5 text-xs text-popover-foreground shadow-md z-10"
+          style={{ left: active.x, top: active.y, transform: 'translate(-50%, calc(-100% - 10px))' }}
         >
-          <div className="mb-0.5 font-medium">{new Date(active.point.date).toLocaleDateString()}</div>
+          <div className="mb-0.5 font-medium">{new Date(activeCoord.point.date).toLocaleDateString()}</div>
           <div className="flex items-center gap-1.5">
             <span className="inline-block h-1.5 w-3 rounded-sm bg-chart-1" />
             <span className="text-muted-foreground">Consumption:</span>
-            <span className="font-semibold tabular-nums">{active.point.consumption.toFixed(1)} L/100km</span>
+            <span className="font-semibold tabular-nums">{activeCoord.point.consumption.toFixed(1)} L/100km</span>
           </div>
         </div>
       )}
