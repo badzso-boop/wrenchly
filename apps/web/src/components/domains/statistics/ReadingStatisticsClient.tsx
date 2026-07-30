@@ -20,17 +20,6 @@ function formatMonthLabel(monthKey: string): string {
   return new Date(year!, (month ?? 1) - 1, 1).toLocaleDateString(undefined, { month: 'short', year: '2-digit' })
 }
 
-function mergeMonthly(metrics: { key: string; monthly: { month: string; total: number }[] }[]) {
-  const months = new Set<string>()
-  for (const m of metrics) for (const p of m.monthly) months.add(p.month)
-  return Array.from(months)
-    .sort()
-    .map((month) => ({
-      label: formatMonthLabel(month),
-      values: Object.fromEntries(metrics.map((m) => [m.key, m.monthly.find((p) => p.month === month)?.total ?? 0])),
-    }))
-}
-
 function StatTile({ label, value }: { label: string; value: string }) {
   return (
     <Card>
@@ -82,10 +71,6 @@ export function ReadingStatisticsClient({ itemId, itemType }: { itemId: string; 
   const { metrics, readingCount } = stats.data
   const lineMetrics = metrics.filter((m) => m.chartType === 'line')
   const barMetrics = metrics.filter((m) => m.chartType === 'bar-monthly')
-  // PROPERTY's electricity/gas/water readings are combined into one multi-series chart rather
-  // than three separate ones (see the PR #9 brief) — every other bar-monthly domain gets one
-  // chart per metric.
-  const combineBarMetrics = itemType === 'PROPERTY' && barMetrics.length > 1
 
   const solarEstimateKwh = solarProfile.data && typeof solarProfile.data.annualYieldEstimateKwh === 'number'
     ? solarProfile.data.annualYieldEstimateKwh
@@ -116,39 +101,24 @@ export function ReadingStatisticsClient({ itemId, itemType }: { itemId: string; 
         <StatTile label="Readings logged" value={String(readingCount)} />
       </div>
 
-      {combineBarMetrics ? (
-        <Card>
+      {/* One chart per metric, even for PROPERTY's electricity/gas/water — those are three
+         different units (kWh/m³/m³), so stacking them into one multi-series bar (as the cost
+         chart does for two same-unit currency series) would combine unlike scales into one
+         meaningless bar height. See the dataviz skill's "one axis" rule. */}
+      {barMetrics.map((m) => (
+        <Card key={m.key}>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Consumption per month</CardTitle>
-            <CardDescription>Electricity, gas, and water usage side by side each month.</CardDescription>
+            <CardTitle className="text-base">{m.label} per month</CardTitle>
+            <CardDescription>{m.showMonthToDate ? 'Sum of every logged reading, bucketed by month.' : `Tracks ${m.label.toLowerCase()} (${m.unit}) by month.`}</CardDescription>
           </CardHeader>
           <CardContent>
             <BarChart
-              data={mergeMonthly(barMetrics)}
-              series={barMetrics.map((m, i) => ({
-                key: m.key,
-                label: m.label,
-                colorClass: (['fill-chart-1', 'fill-chart-2', 'fill-chart-3'] as const)[i % 3]!,
-              }))}
+              data={m.monthly.map((p) => ({ label: formatMonthLabel(p.month), values: { [m.key]: p.total } }))}
+              series={[{ key: m.key, label: m.label, colorClass: 'fill-chart-1' }]}
             />
           </CardContent>
         </Card>
-      ) : (
-        barMetrics.map((m) => (
-          <Card key={m.key}>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">{m.label} per month</CardTitle>
-              <CardDescription>{m.showMonthToDate ? 'Sum of every logged reading, bucketed by month.' : `Tracks ${m.label.toLowerCase()} (${m.unit}) by month.`}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <BarChart
-                data={m.monthly.map((p) => ({ label: formatMonthLabel(p.month), values: { [m.key]: p.total } }))}
-                series={[{ key: m.key, label: m.label, colorClass: 'fill-chart-1' }]}
-              />
-            </CardContent>
-          </Card>
-        ))
-      )}
+      ))}
 
       {lineMetrics.map((m) => (
         <Card key={m.key}>
