@@ -24,9 +24,9 @@ export function StatisticsPageClient({ itemId }: { itemId: string }) {
         <div className="max-w-2xl mx-auto">
           {item.data?.type === 'VEHICLE' ? (
             <VehicleStatisticsClient itemId={itemId} />
-          ) : (
-            <ReadingStatisticsClient itemId={itemId} />
-          )}
+          ) : item.data ? (
+            <ReadingStatisticsClient itemId={itemId} itemType={item.data.type} />
+          ) : null}
         </div>
       </div>
     </div>
