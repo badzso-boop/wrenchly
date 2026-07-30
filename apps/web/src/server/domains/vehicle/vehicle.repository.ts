@@ -18,6 +18,7 @@ export class VehicleRepository {
     currentOdometer?: number | null
     licensePlate?: string | null
     color?: string | null
+    fuelTankLiters?: number | null
   }): Promise<VehicleProfile> {
     return this.db.vehicleProfile.create({ data })
   }
@@ -33,6 +34,7 @@ export class VehicleRepository {
       engineDisplacement?: number | null
       licensePlate?: string | null
       color?: string | null
+      fuelTankLiters?: number | null
     }
   ): Promise<VehicleProfile> {
     return this.db.vehicleProfile.update({ where: { itemId }, data })

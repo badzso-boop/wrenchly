@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { DateField } from '@/components/ui/date-field'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent } from '@/components/ui/card'
@@ -119,7 +120,7 @@ function EditMaintenanceForm({ record, itemType, onDone }: EditMaintenanceFormPr
       <div className={itemType === 'VEHICLE' ? 'grid grid-cols-2 gap-3' : 'grid grid-cols-1 gap-3'}>
         <div className="space-y-1.5">
           <Label htmlFor={`edit-date-${record.id}`}>Date *</Label>
-          <Input id={`edit-date-${record.id}`} type="date" value={performedAt} onChange={(e) => setPerformedAt((e.target as HTMLInputElement).value)} required />
+          <DateField id={`edit-date-${record.id}`} value={performedAt} onChange={setPerformedAt} required />
         </div>
         {itemType === 'VEHICLE' && (
           <div className="space-y-1.5">
