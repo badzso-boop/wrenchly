@@ -87,4 +87,12 @@ export const maintenanceRouter = createTRPCRouter({
       const service = new MaintenanceService(repo)
       return service.getTotalCost(input.itemId)
     }),
+
+  getFrequencyByMonth: protectedProcedure
+    .input(z.object({ itemId: z.string(), category: z.string() }))
+    .query(({ ctx, input }) => {
+      const repo = new MaintenanceRepository(ctx.db)
+      const service = new MaintenanceService(repo)
+      return service.getFrequencyByMonth(input.itemId, ctx.userId, input.category)
+    }),
 })

@@ -116,6 +116,7 @@ model Item {
   photos             Photo[]
   shareExports       ShareExport[]
   tripLogs           TripLog[]
+  readings           ItemReading[]
 
   vehicleProfile    VehicleProfile?
   propertyProfile   PropertyProfile?
@@ -211,21 +212,25 @@ model Part {
 }
 
 model TripLog {
-  id               String   @id @default(cuid())
-  itemId           String
-  userId           String
-  startedAt        DateTime
-  description      String?
-  notes            String?
-  startOdometer    Int
-  distanceKm       Int
-  endOdometer      Int
-  startFuelLiters  Decimal? @db.Decimal(6, 2)
-  totalFuelQty     Decimal  @default(0) @db.Decimal(7, 3)
-  totalFuelCost    Decimal  @default(0) @db.Decimal(10, 2)
-  totalExpenseCost Decimal  @default(0) @db.Decimal(10, 2)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id                 String   @id @default(cuid())
+  itemId             String
+  userId             String
+  startedAt          DateTime
+  description        String?
+  notes              String?
+  startOdometer      Int
+  distanceKm         Int
+  endOdometer        Int
+  startFuelLiters    Decimal? @db.Decimal(6, 2)
+  totalFuelQty       Decimal  @default(0) @db.Decimal(7, 3)
+  totalFuelCost      Decimal  @default(0) @db.Decimal(10, 2)
+  totalExpenseCost   Decimal  @default(0) @db.Decimal(10, 2)
+  durationMin        Int? // BICYCLE/DRONE; VEHICLE/BOAT never set it
+  elevationGainM     Int? // BICYCLE-specific
+  batteryPercentUsed Int? // DRONE-specific
+  maxAltitudeM       Int? // DRONE-specific
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   item      Item           @relation(fields: [itemId], references: [id], onDelete: Cascade)
   fuelStops TripFuelStop[]
@@ -273,6 +278,21 @@ enum TripExpenseType {
   VIGNETTE
   PARKING
   OTHER
+}
+
+model ItemReading {
+  id         String   @id @default(cuid())
+  itemId     String
+  userId     String
+  recordedAt DateTime
+  metrics    Json // Record<string, number>; keys defined per item type by READING_METRICS
+  notes      String?
+  createdAt  DateTime @default(now())
+
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([itemId, recordedAt])
+  @@map("item_readings")
 }
 
 model Photo {

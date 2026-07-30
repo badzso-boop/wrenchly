@@ -10,6 +10,7 @@ const mockMaintenanceRepo = {
   update: vi.fn(),
   delete: vi.fn(),
   sumCostByItemId: vi.fn(),
+  countByCategoryPerMonth: vi.fn(),
 }
 
 const service = new MaintenanceService(mockMaintenanceRepo as any)
@@ -115,5 +116,17 @@ describe('MaintenanceService.getTotalCost', () => {
 
     const result = await service.getTotalCost('item-1')
     expect(result).toBe(55000)
+  })
+})
+
+describe('MaintenanceService.getFrequencyByMonth', () => {
+  it('delegates to the repository with itemId/userId/category, used by the reading-statistics watering/water-change charts', async () => {
+    const monthly = [{ month: '2026-01', count: 2 }, { month: '2026-02', count: 1 }]
+    mockMaintenanceRepo.countByCategoryPerMonth.mockResolvedValue(monthly)
+
+    const result = await service.getFrequencyByMonth('item-1', 'user-1', 'WATERING')
+
+    expect(mockMaintenanceRepo.countByCategoryPerMonth).toHaveBeenCalledWith('item-1', 'user-1', 'WATERING')
+    expect(result).toEqual(monthly)
   })
 })

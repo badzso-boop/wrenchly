@@ -1,4 +1,5 @@
 import { type PrismaClient, type MaintenanceRecord, type Part } from '@prisma/client'
+import { format } from 'date-fns'
 
 type MaintenanceRecordWithParts = MaintenanceRecord & { parts: Part[] }
 
@@ -104,5 +105,28 @@ export class MaintenanceRepository {
       _sum: { costTotal: true },
     })
     return Number(result._sum.costTotal ?? 0)
+  }
+
+  /** Used by reading statistics for domains whose "frequency" chart is really a count of
+   * existing MaintenanceRecords (e.g. PLANT watering, AQUARIUM water changes) rather than a new
+   * ItemReading metric — no new schema needed for these. */
+  async countByCategoryPerMonth(
+    itemId: string,
+    userId: string,
+    category: string
+  ): Promise<{ month: string; count: number }[]> {
+    const records = await this.db.maintenanceRecord.findMany({
+      where: { itemId, userId, category },
+      select: { performedAt: true },
+    })
+
+    const monthlyMap = new Map<string, number>()
+    for (const r of records) {
+      const key = format(r.performedAt, 'yyyy-MM')
+      monthlyMap.set(key, (monthlyMap.get(key) ?? 0) + 1)
+    }
+    return Array.from(monthlyMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([month, count]) => ({ month, count }))
   }
 }
