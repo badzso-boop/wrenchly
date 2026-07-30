@@ -2,8 +2,9 @@
 import { api } from '@/lib/trpc/client'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
-import { VehicleStatisticsClient } from './VehicleStatisticsClient'
+import { TripStatisticsClient } from './TripStatisticsClient'
 import { ReadingStatisticsClient } from './ReadingStatisticsClient'
+import { isTripLogItemType } from '@/server/domains/trip/trip.labels'
 import { Button } from '@/components/ui/button'
 
 export function StatisticsPageClient({ itemId }: { itemId: string }) {
@@ -22,8 +23,8 @@ export function StatisticsPageClient({ itemId }: { itemId: string }) {
       </div>
       <div className="flex-1 overflow-auto px-6 py-6 animate-in fade-in-0 duration-300">
         <div className="max-w-2xl mx-auto">
-          {item.data?.type === 'VEHICLE' ? (
-            <VehicleStatisticsClient itemId={itemId} />
+          {item.data && isTripLogItemType(item.data.type) ? (
+            <TripStatisticsClient itemId={itemId} itemType={item.data.type} />
           ) : item.data ? (
             <ReadingStatisticsClient itemId={itemId} itemType={item.data.type} />
           ) : null}
