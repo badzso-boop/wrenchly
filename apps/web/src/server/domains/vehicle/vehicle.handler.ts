@@ -5,6 +5,20 @@ import { VehicleService } from './vehicle.service'
 import { ItemRepository } from '@/server/domains/item/item.repository'
 import { ReminderRepository } from '@/server/domains/reminder/reminder.repository'
 
+const EXTENDED_VEHICLE_FIELDS = {
+  variant: z.string().max(100).optional(),
+  powerKw: z.number().int().nonnegative().optional(),
+  transmission: z.string().max(50).optional(),
+  driveType: z.string().max(20).optional(),
+  oilSpec: z.string().max(50).optional(),
+  coolantType: z.string().max(50).optional(),
+  brakeFluidType: z.string().max(50).optional(),
+  tireSizeFront: z.string().max(30).optional(),
+  tireSizeRear: z.string().max(30).optional(),
+  tirePressureFront: z.number().positive().optional(),
+  tirePressureRear: z.number().positive().optional(),
+}
+
 export const vehicleRouter = createTRPCRouter({
   getByItemId: protectedProcedure
     .input(z.object({ itemId: z.string() }))
@@ -30,6 +44,7 @@ export const vehicleRouter = createTRPCRouter({
         licensePlate: z.string().max(20).optional(),
         color: z.string().max(50).optional(),
         fuelTankLiters: z.number().int().positive().optional(),
+        ...EXTENDED_VEHICLE_FIELDS,
       })
     )
     .mutation(({ ctx, input }) => {
@@ -53,6 +68,7 @@ export const vehicleRouter = createTRPCRouter({
         licensePlate: z.string().max(20).optional(),
         color: z.string().max(50).optional(),
         fuelTankLiters: z.number().int().positive().optional(),
+        ...EXTENDED_VEHICLE_FIELDS,
       })
     )
     .mutation(({ ctx, input }) => {
