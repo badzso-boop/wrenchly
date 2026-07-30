@@ -1,7 +1,7 @@
 'use client'
 import { api } from '@/lib/trpc/client'
 import { BarChart } from './charts/BarChart'
-import { ConsumptionTrendChart } from './charts/ConsumptionTrendChart'
+import { LineChart } from './charts/LineChart'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 
@@ -97,7 +97,10 @@ export function VehicleStatisticsClient({ itemId }: { itemId: string }) {
           <CardDescription>Your fuel efficiency per trip — a rising trend can mean it's time for a maintenance check, or just more demanding driving.</CardDescription>
         </CardHeader>
         <CardContent>
-          <ConsumptionTrendChart points={consumptionTrend} />
+          <LineChart
+            points={consumptionTrend.map((c) => ({ date: c.date, value: c.consumption }))}
+            unitLabel="L/100km"
+          />
         </CardContent>
       </Card>
     </div>
