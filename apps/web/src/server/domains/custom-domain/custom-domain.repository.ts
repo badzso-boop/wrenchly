@@ -15,6 +15,7 @@ export type CustomDomainWithFields = CustomDomain & { fields: FieldWithConfig[] 
 export type EntryWithValues = CustomItemDataEntry & {
   values: (CustomDomainFieldValue & { field: CustomDomainField })[]
 }
+export type CustomDomainStoreListing = CustomDomainWithFields & { customItemDataEntries: EntryWithValues[] }
 
 export class CustomDomainRepository {
   constructor(private db: PrismaClient) {}
@@ -78,6 +79,18 @@ export class CustomDomainRepository {
       where: { itemId },
       data: { data: data as Prisma.InputJsonValue },
     })
+  }
+
+  /** The "sample item" for a published domain's own sample-data editor is simply the oldest Item
+   * the publisher has attached to this domain -- there's no separate sample-item flag/concept,
+   * this is a deliberate reuse of whatever the publisher already has rather than a new model. */
+  async findSampleItemForDomain(customDomainId: string, userId: string) {
+    const itemData = await this.db.customItemData.findFirst({
+      where: { customDomainId, item: { userId } },
+      orderBy: { item: { createdAt: 'asc' } },
+      include: { item: true },
+    })
+    return itemData?.item ?? null
   }
 
   // ─── Log-tab widget builder ────────────────────────────────────────────────
@@ -279,10 +292,20 @@ export class CustomDomainRepository {
     })
   }
 
-  async listPublished(): Promise<CustomDomainWithFields[]> {
+  /** Store listing includes each domain's single most-recent entry (by recordedAt, across any
+   * item attached to it -- CustomItemDataEntry carries customDomainId directly, no need to know
+   * a specific item) as a read-only "sample data" preview for browsers who don't own the domain. */
+  async listPublished(): Promise<CustomDomainStoreListing[]> {
     return this.db.customDomain.findMany({
       where: { isPublished: true, isPublic: true },
-      include: { fields: { where: { archivedAt: null }, orderBy: { order: 'asc' }, include: { fieldConfig: true } } },
+      include: {
+        fields: { where: { archivedAt: null }, orderBy: { order: 'asc' }, include: { fieldConfig: true } },
+        customItemDataEntries: {
+          take: 1,
+          orderBy: { recordedAt: 'desc' },
+          include: { values: { include: { field: true } } },
+        },
+      },
     })
   }
 

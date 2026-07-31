@@ -80,6 +80,10 @@ export const customDomainLogRouter = createTRPCRouter({
     .input(z.object({ sourceDomainId: z.string() }))
     .mutation(({ ctx, input }) => makeService(ctx.db).importDomain(input.sourceDomainId, ctx.userId)),
 
+  getSampleItem: protectedProcedure
+    .input(z.object({ customDomainId: z.string() }))
+    .query(({ ctx, input }) => makeService(ctx.db).getSampleItem(input.customDomainId, ctx.userId)),
+
   listEntries: protectedProcedure
     .input(z.object({ itemId: z.string() }))
     .query(({ ctx, input }) => makeService(ctx.db).listEntries(input.itemId, ctx.userId)),

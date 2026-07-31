@@ -3,6 +3,7 @@ import { type FieldType } from '@prisma/client'
 import {
   type CustomDomainRepository,
   type CustomDomainWithFields,
+  type CustomDomainStoreListing,
   type FieldWithConfig,
   type EntryWithValues,
 } from './custom-domain.repository'
@@ -131,7 +132,7 @@ export class CustomDomainLogService {
     return this.domainRepo.publishDomain(customDomainId)
   }
 
-  listStore(): Promise<CustomDomainWithFields[]> {
+  listStore(): Promise<CustomDomainStoreListing[]> {
     return this.domainRepo.listPublished()
   }
 
@@ -141,6 +142,11 @@ export class CustomDomainLogService {
       throw new TRPCError({ code: 'NOT_FOUND', message: 'errors.custom_domain.not_found' })
     }
     return this.domainRepo.cloneDomain(sourceDomainId, userId)
+  }
+
+  async getSampleItem(customDomainId: string, userId: string) {
+    await this.assertDomainOwnership(customDomainId, userId)
+    return this.domainRepo.findSampleItemForDomain(customDomainId, userId)
   }
 
   // ─── Log entries ──────────────────────────────────────────────────────────
