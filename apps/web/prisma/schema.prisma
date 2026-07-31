@@ -119,6 +119,7 @@ model Item {
   readings              ItemReading[]
   printJobs             PrintJob[]
   customItemDataEntries CustomItemDataEntry[]
+  fuelUps               FuelUp[]
 
   vehicleProfile    VehicleProfile?
   propertyProfile   PropertyProfile?
@@ -234,9 +235,9 @@ model TripLog {
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
-  item      Item           @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  fuelStops TripFuelStop[]
-  expenses  TripExpense[]
+  item     Item          @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  expenses TripExpense[]
+  fuelUps  FuelUp[]      @relation("TripFuelUps")
 
   @@index([itemId])
   @@index([itemId, startedAt])
@@ -244,21 +245,32 @@ model TripLog {
   @@map("trip_logs")
 }
 
-model TripFuelStop {
-  id           String  @id @default(cuid())
-  tripLogId    String
-  quantity     Decimal @db.Decimal(7, 3)
-  unit         String  @default("liter")
-  pricePerUnit Decimal @db.Decimal(10, 2)
-  totalPaid    Decimal @db.Decimal(10, 2)
-  currency     String  @default("HUF")
+// Standalone fuel-up event, decoupled from any single trip (N-N with TripLog): one fill-up can
+// cover several already-logged trips (drive around on one tank, refuel once, assign afterward),
+// and one trip can still have multiple fuel-ups (e.g. two top-ups on one long journey) — this
+// generalizes what the old per-trip TripFuelStop supported as its 1-fuel-up-per-trip special
+// case. Only ever used by VEHICLE/BOAT (trip.labels.ts's showFuelSection).
+model FuelUp {
+  id           String   @id @default(cuid())
+  itemId       String
+  userId       String
+  occurredAt   DateTime
+  quantity     Decimal  @db.Decimal(7, 3)
+  unit         String   @default("liter")
+  pricePerUnit Decimal  @db.Decimal(10, 2)
+  totalPaid    Decimal  @db.Decimal(10, 2)
+  currency     String   @default("HUF")
   fuelType     String?
   station      String?
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  tripLog TripLog @relation(fields: [tripLogId], references: [id], onDelete: Cascade)
+  item  Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  trips TripLog[] @relation("TripFuelUps")
 
-  @@index([tripLogId])
-  @@map("trip_fuel_stops")
+  @@index([itemId, occurredAt])
+  @@map("fuel_ups")
 }
 
 model TripExpense {
