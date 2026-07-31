@@ -45,8 +45,6 @@ export class TripRepository {
     distanceKm: number
     endOdometer: number
     startFuelLiters?: number | null
-    totalFuelQty: number
-    totalFuelCost: number
     totalExpenseCost: number
     durationMin?: number | null
     elevationGainM?: number | null
@@ -79,8 +77,6 @@ export class TripRepository {
       distanceKm?: number
       endOdometer?: number
       startFuelLiters?: number | null
-      totalFuelQty?: number
-      totalFuelCost?: number
       totalExpenseCost?: number
       durationMin?: number | null
       elevationGainM?: number | null

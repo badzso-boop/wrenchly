@@ -32,14 +32,6 @@ interface ExpenseForm {
   description: string
 }
 
-function consumptionLabel(trip: TripWithChildren, itemType: ItemType): string | null {
-  const fuelQty = Number(trip.totalFuelQty)
-  if (fuelQty <= 0 || trip.distanceKm <= 0) return null
-  const divisor = itemType === 'BOAT' ? trip.distanceKm : trip.distanceKm / 100
-  const unit = itemType === 'BOAT' ? 'L/hour' : 'L/100km'
-  return `${(fuelQty / divisor).toFixed(1)} ${unit}`
-}
-
 function EditTripLogForm({ trip, itemType, onDone }: { trip: TripWithChildren; itemType: ItemType; onDone: () => void }) {
   const labels = getTripLogLabels(itemType)
   const utils = api.useUtils()
@@ -245,8 +237,7 @@ export function TripLogList({ trips, itemType }: { trips: TripWithChildren[]; it
     <div className="space-y-2">
       {trips.map((trip) => {
         const isExpanded = expanded === trip.id
-        const consumption = consumptionLabel(trip, itemType)
-        const totalCost = Number(trip.totalFuelCost) + Number(trip.totalExpenseCost)
+        const totalCost = Number(trip.totalExpenseCost)
         const distanceUnit = labels.distanceFieldLabel.toLowerCase().includes('hour') ? 'h' : 'km'
 
         return (
@@ -259,11 +250,6 @@ export function TripLogList({ trips, itemType }: { trips: TripWithChildren[]; it
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-0.5 flex-wrap">
                     <span className="font-medium text-sm truncate">{trip.description || 'Trip'}</span>
-                    {consumption && (
-                      <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-primary/10 text-primary shrink-0">
-                        {consumption}
-                      </span>
-                    )}
                   </div>
                   <div className="flex items-center gap-3 text-xs text-muted-foreground">
                     <span>{new Date(trip.startedAt).toLocaleDateString()}</span>
