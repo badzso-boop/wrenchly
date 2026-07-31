@@ -12,6 +12,14 @@ import type { ItemType } from '@prisma/client'
 // BicycleProfile field later if that's ever wanted.
 const CHAIN_REPLACEMENT_INTERVAL_KM = 2500
 
+// From PR #7: show a real currency label next to cost totals instead of a bare number, since
+// fuel/expense costs are entered per-fuel-stop/per-expense with their own currency.
+function currencyLabel(currencies: string[]): string {
+  if (currencies.length === 0) return ''
+  if (currencies.length > 1) return 'mixed currencies'
+  return currencies[0] === 'HUF' ? 'Ft' : (currencies[0] ?? '')
+}
+
 function StatTile({ label, value, hint }: { label: string; value: string; hint: string }) {
   return (
     <Card>
@@ -49,7 +57,9 @@ export function TripStatisticsClient({ itemId, itemType }: { itemId: string; ite
     )
   }
 
-  const { allTime, last30Days, monthly, consumptionTrend, consumptionUnit, speedTrend, batteryTrend, tripCount } = stats.data
+  const { allTime, last30Days, monthly, consumptionTrend, consumptionUnit, speedTrend, batteryTrend, currencies, tripCount } = stats.data
+  const currency = currencyLabel(currencies)
+  const mixedCurrencies = currencies.length > 1
 
   if (itemType === 'BICYCLE') {
     const chainKm = typeof profile.data?.chainKm === 'number' ? profile.data.chainKm : null
@@ -171,8 +181,16 @@ export function TripStatisticsClient({ itemId, itemType }: { itemId: string; ite
     <div className="space-y-5">
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <StatTile label={distanceTileLabel} value={`${allTime.distanceKm.toLocaleString()} ${distanceLabel}`} hint="Since your first logged entry" />
-        <StatTile label="Total fuel cost" value={allTime.fuelCost.toLocaleString()} hint="All fuel purchases combined" />
-        <StatTile label="Tolls, vignettes & parking" value={allTime.expenseCost.toLocaleString()} hint="All logged road/water-usage costs" />
+        <StatTile
+          label="Total fuel cost"
+          value={`${allTime.fuelCost.toLocaleString()} ${currency}`}
+          hint={mixedCurrencies ? 'Amounts added as-is, not converted' : 'All fuel purchases combined'}
+        />
+        <StatTile
+          label="Tolls, vignettes & parking"
+          value={`${allTime.expenseCost.toLocaleString()} ${currency}`}
+          hint={mixedCurrencies ? 'Amounts added as-is, not converted' : 'All logged road/water-usage costs'}
+        />
         <StatTile
           label="Avg. consumption (all time)"
           value={allTime.avgConsumption > 0 ? `${allTime.avgConsumption.toFixed(1)} ${consumptionUnit}` : '—'}
@@ -211,6 +229,7 @@ export function TripStatisticsClient({ itemId, itemType }: { itemId: string; ite
               { key: 'fuelCost', label: 'Fuel', colorClass: 'fill-chart-1' },
               { key: 'expenseCost', label: 'Tolls/Parking', colorClass: 'fill-chart-2' },
             ]}
+            valueFormatter={(n) => `${n.toLocaleString()} ${currency}`}
           />
         </CardContent>
       </Card>

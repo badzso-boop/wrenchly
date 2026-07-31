@@ -267,6 +267,13 @@ export class TripService {
       .filter((t) => t.batteryPercentUsed != null)
       .map((t) => ({ date: t.startedAt, batteryPercentUsed: t.batteryPercentUsed! }))
 
+    // From PR #7: which currencies actually appear across this item's fuel stops/expenses (only
+    // ever non-empty for VEHICLE/BOAT, the two types with cost tracking) — lets the UI show a
+    // real currency label, or flag mixed currencies, instead of a bare unlabeled number.
+    const currencies = Array.from(
+      new Set(trips.flatMap((t) => [...t.fuelStops.map((f) => f.currency), ...t.expenses.map((e) => e.currency)]))
+    )
+
     return {
       allTime,
       last30Days,
@@ -275,6 +282,7 @@ export class TripService {
       consumptionUnit: consumptionUnitFor(item.type),
       speedTrend,
       batteryTrend,
+      currencies,
       tripCount: trips.length,
     }
   }
