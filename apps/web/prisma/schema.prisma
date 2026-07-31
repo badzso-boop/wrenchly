@@ -120,6 +120,9 @@ model Item {
   printJobs             PrintJob[]
   customItemDataEntries CustomItemDataEntry[]
   fuelUps               FuelUp[]
+  householdTransactions HouseholdTransaction[]
+  cookingLogEntries     CookingLogEntry[]
+  favoriteMeals         FavoriteMeal[]
 
   vehicleProfile    VehicleProfile?
   propertyProfile   PropertyProfile?
@@ -134,6 +137,7 @@ model Item {
   instrumentProfile InstrumentProfile?
   solarProfile      SolarProfile?
   customItemData    CustomItemData?
+  homeProfile       HomeProfile?
 
   @@index([userId])
   @@index([userId, type])
@@ -158,6 +162,7 @@ enum ItemType {
   BICYCLE
   SOLAR
   CUSTOM
+  HOME
 }
 
 enum ItemStatus {
@@ -458,10 +463,12 @@ model ShoppingListItem {
   priority        ShoppingPriority @default(MEDIUM)
   status          ShoppingStatus   @default(PENDING)
   notes           String?
+  cookingLogEntryId String?
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cookingLogEntry CookingLogEntry? @relation(fields: [cookingLogEntryId], references: [id], onDelete: SetNull)
 
   @@index([userId, status])
   @@map("shopping_list_items")
@@ -715,6 +722,89 @@ model SolarProfile {
   item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
 
   @@map("solar_profiles")
+}
+
+model HomeProfile {
+  itemId        String  @id
+  householdSize Int? // how many people live there — useful later for per-head stats
+  notes         String?
+
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@map("home_profiles")
+}
+
+// ─── HOME EXPENSES & COOKING ─────────────────────────────────────────────────
+
+enum HouseholdTransactionType {
+  EXPENSE
+  INCOME
+}
+
+model HouseholdTransaction {
+  id          String                   @id @default(cuid())
+  itemId      String
+  userId      String
+  type        HouseholdTransactionType
+  amount      Decimal                  @db.Decimal(10, 2)
+  currency    String                   @default("HUF")
+  category    String? // free string, not a DB enum — EXPENSE uses the expense list, INCOME
+  // uses the income list (see household-finance.categories.ts), same convention as
+  // maintenance.category/PrintJob.materialType
+  paidBy      String // free string, hardcoded frontend dropdown for now (see plan doc)
+  store       String? // optional, expense-only in practice (e.g. "Lidl", "Wolt")
+  description String?
+  occurredAt  DateTime
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
+
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  cookingLogEntries CookingLogEntry[]
+
+  @@index([itemId, occurredAt])
+  @@index([itemId, type])
+  @@map("household_transactions")
+}
+
+model CookingLogEntry {
+  id                  String    @id @default(cuid())
+  itemId              String
+  userId              String
+  name                String // the meal's name — fuzzy-matched against existing names on create
+  ingredients         String? // free-text ingredient list (MVP: not structured)
+  servings            Int?
+  daysCovered         Int?
+  cost                Decimal?  @db.Decimal(10, 2)
+  currency            String    @default("HUF")
+  linkedTransactionId String? // optional link to the grocery expense that covered this meal
+  cookedAt            DateTime
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  item              Item                  @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  linkedTransaction HouseholdTransaction? @relation(fields: [linkedTransactionId], references: [id], onDelete: SetNull)
+
+  shoppingListItems ShoppingListItem[]
+
+  @@index([itemId, cookedAt])
+  @@index([itemId, name])
+  @@map("cooking_log_entries")
+}
+
+model FavoriteMeal {
+  id        String   @id @default(cuid())
+  itemId    String
+  userId    String
+  name      String // also fuzzy-matched against CookingLogEntry/FavoriteMeal names on create
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([itemId])
+  @@map("favorite_meals")
 }
 
 // ─── CUSTOM DOMAIN ───────────────────────────────────────────────────────────

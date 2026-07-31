@@ -164,6 +164,10 @@ export const PROFILE_FIELDS: Partial<Record<ItemType, ProfileFieldDef[]>> = {
     { key: 'annualYieldEstimateKwh', label: 'Annual yield estimate', type: 'number', unit: 'kWh' },
     { key: 'monitoringUrl', label: 'Monitoring URL', type: 'text' },
   ],
+  HOME: [
+    { key: 'householdSize', label: 'Household size', type: 'number' },
+    { key: 'notes', label: 'Notes', type: 'text' },
+  ],
 }
 
 export type ProfileItemType = keyof typeof PROFILE_FIELDS

@@ -21,6 +21,7 @@ import type { ItemType } from '@prisma/client'
 const ITEM_TYPES: { value: ItemType; label: string }[] = [
   { value: 'VEHICLE', label: '🚗 Vehicle' },
   { value: 'PROPERTY', label: '🏠 Property' },
+  { value: 'HOME', label: '🏡 Home' },
   { value: 'PLANT', label: '🌱 Plant' },
   { value: 'MACHINE', label: '⚙️ Machine' },
   { value: 'TOOL', label: '🔧 Tool' },
@@ -41,6 +42,7 @@ const ITEM_TYPES: { value: ItemType; label: string }[] = [
 const NAME_EXAMPLES: Partial<Record<ItemType, string>> = {
   VEHICLE: 'e.g. Ford Focus 2015',
   PROPERTY: 'e.g. Main House',
+  HOME: 'e.g. Main Household',
   PLANT: 'e.g. Living room Monstera',
   MACHINE: 'e.g. Table saw',
   TOOL: 'e.g. Cordless drill',

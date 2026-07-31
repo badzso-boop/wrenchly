@@ -59,6 +59,8 @@ export class ProfileRepository {
         return this.db.instrumentProfile.findUnique({ where: { itemId } })
       case 'SOLAR':
         return this.db.solarProfile.findUnique({ where: { itemId } })
+      case 'HOME':
+        return this.db.homeProfile.findUnique({ where: { itemId } })
       default:
         return Promise.resolve(null)
     }
@@ -130,6 +132,12 @@ export class ProfileRepository {
         return this.db.solarProfile.upsert({
           where: { itemId },
           create: { itemId, ...data } as Parameters<typeof this.db.solarProfile.create>[0]['data'],
+          update: data,
+        })
+      case 'HOME':
+        return this.db.homeProfile.upsert({
+          where: { itemId },
+          create: { itemId, ...data } as Parameters<typeof this.db.homeProfile.create>[0]['data'],
           update: data,
         })
       default:

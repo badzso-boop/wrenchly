@@ -14,6 +14,9 @@ import { shareRouter } from '@/server/domains/share/share.handler'
 import { tripRouter } from '@/server/domains/trip/trip.handler'
 import { readingRouter } from '@/server/domains/reading/reading.handler'
 import { printJobRouter } from '@/server/domains/printjob/printjob.handler'
+import { householdFinanceRouter } from '@/server/domains/household-finance/household-finance.handler'
+import { cookingRouter } from '@/server/domains/cooking/cooking.handler'
+import { favoriteMealRouter } from '@/server/domains/favorite-meal/favorite-meal.handler'
 
 export const appRouter = createTRPCRouter({
   item: itemRouter,
@@ -31,6 +34,9 @@ export const appRouter = createTRPCRouter({
   trip: tripRouter,
   reading: readingRouter,
   printJob: printJobRouter,
+  householdFinance: householdFinanceRouter,
+  cooking: cookingRouter,
+  favoriteMeal: favoriteMealRouter,
 })
 
 export type AppRouter = typeof appRouter
