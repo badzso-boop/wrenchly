@@ -145,6 +145,7 @@ export function BarChart({
                       rx={2}
                       className={s.colorClass}
                       opacity={isActive ? 1 : 0.88}
+                      pointerEvents="none"
                     />
                   )
                 })}
