@@ -332,7 +332,7 @@ export class CustomDomainRepository {
           })),
         },
       },
-      include: { fields: { orderBy: { order: 'asc' } } },
+      include: { fields: { orderBy: { order: 'asc' }, include: { fieldConfig: true } } },
     })
   }
 }

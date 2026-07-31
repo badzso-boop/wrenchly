@@ -1,7 +1,24 @@
 'use client'
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { GripVertical, ChevronUp, ChevronDown, MoreVertical, Plus, Archive } from 'lucide-react'
+import { GripVertical, MoreVertical, Plus, Archive } from 'lucide-react'
+import {
+  DndContext,
+  type DragEndEvent,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  arrayMove,
+  useSortable,
+  rectSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { api } from '@/lib/trpc/client'
 import { Button } from '@/components/ui/button'
 import {
@@ -12,28 +29,21 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { LOG_FIELD_TYPES, getLogFieldTypeDef } from './custom-log-field-types'
 import { LoggableFieldDialog, type LoggableFieldFormResult } from './LoggableFieldDialog'
-import type { CustomDomainField, FieldType } from '@prisma/client'
+import type { FieldType } from '@prisma/client'
 import type { FieldWithConfig } from '@/server/domains/custom-domain/custom-domain.repository'
 
 interface DomainForBuilder {
   id: string
-  fields: CustomDomainField[]
-}
-
-/** Fields fetched via `customDomain.listMine` don't include the joined `fieldConfig` row (that
- * query isn't scoped to this phase's needs). We only learn a field's real config when this
- * session creates or edits it (both mutations return the full row with config). Editing a field
- * from an earlier session, before touching it here, opens the dialog with blank config inputs --
- * the field itself and its data are unaffected, only the edit dialog's prefill is incomplete.
- * A dedicated "get fields with config" query would remove this gap; left as a follow-up. */
-function toFieldWithConfigFallback(field: CustomDomainField): FieldWithConfig {
-  return { ...field, fieldConfig: null }
+  fields: FieldWithConfig[]
 }
 
 export function CustomLogBuilder({ domain, onChanged }: { domain: DomainForBuilder; onChanged: () => void }) {
   const utils = api.useUtils()
-  const [configCache, setConfigCache] = useState<Record<string, FieldWithConfig>>({})
   const [dialog, setDialog] = useState<{ fieldType: FieldType; existing?: FieldWithConfig } | null>(null)
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  )
 
   const activeFields = domain.fields
     .filter((f) => f.loggable && !f.archivedAt)
@@ -48,17 +58,17 @@ export function CustomLogBuilder({ domain, onChanged }: { domain: DomainForBuild
     onError: (err) => toast.error(err.message),
   })
 
-  function move(fieldId: string, direction: -1 | 1) {
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
     const ids = activeFields.map((f) => f.id)
-    const idx = ids.indexOf(fieldId)
-    const swapWith = idx + direction
-    if (swapWith < 0 || swapWith >= ids.length) return
-    ;[ids[idx], ids[swapWith]] = [ids[swapWith]!, ids[idx]!]
-    reorder.mutate({ customDomainId: domain.id, orderedFieldIds: ids })
+    const from = ids.indexOf(String(active.id))
+    const to = ids.indexOf(String(over.id))
+    if (from === -1 || to === -1) return
+    reorder.mutate({ customDomainId: domain.id, orderedFieldIds: arrayMove(ids, from, to) })
   }
 
   function handleSaved(result: LoggableFieldFormResult) {
-    setConfigCache((prev) => ({ ...prev, [result.field.id]: result.field }))
     if (result.insertionSide === 'left' && activeFields.length > 0) {
       const priorIds = activeFields.map((f) => f.id)
       const reordered = [...priorIds.slice(0, -1), result.field.id, priorIds[priorIds.length - 1]!]
@@ -90,51 +100,22 @@ export function CustomLogBuilder({ domain, onChanged }: { domain: DomainForBuild
       {activeFields.length === 0 ? (
         <p className="text-sm text-muted-foreground">No log fields yet — add one with the + button above.</p>
       ) : (
-        <div className="grid grid-cols-2 gap-2">
-          {activeFields.map((field, i) => {
-            const typeDef = getLogFieldTypeDef(field.fieldType)
-            return (
-              <div
-                key={field.id}
-                className={`flex items-center gap-1.5 rounded-lg border p-2 ${field.widthCols === 2 ? 'col-span-2' : 'col-span-1'}`}
-              >
-                <GripVertical className="h-3.5 w-3.5 text-muted-foreground/50 shrink-0" />
-                <typeDef.icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                <span className="text-sm truncate flex-1">
-                  {field.name}
-                  {field.unit ? ` (${field.unit})` : ''}
-                  {field.required ? ' *' : ''}
-                </span>
-                <div className="flex items-center shrink-0">
-                  <Button variant="ghost" size="icon" className="h-6 w-6" disabled={i === 0} onClick={() => move(field.id, -1)}>
-                    <ChevronUp className="h-3 w-3" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-6 w-6" disabled={i === activeFields.length - 1} onClick={() => move(field.id, 1)}>
-                    <ChevronDown className="h-3 w-3" />
-                  </Button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="h-6 w-6" />}>
-                      <MoreVertical className="h-3 w-3" />
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={() => setDialog({ fieldType: field.fieldType, existing: configCache[field.id] ?? toFieldWithConfigFallback(field) })}
-                      >
-                        Configure
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        variant="destructive"
-                        onClick={() => { if (window.confirm(`Remove "${field.name}" from the log form?`)) archive.mutate({ fieldId: field.id }) }}
-                      >
-                        <Archive className="h-3.5 w-3.5" /> Remove
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </div>
-            )
-          })}
-        </div>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={activeFields.map((f) => f.id)} strategy={rectSortingStrategy}>
+            <div className="grid grid-cols-2 gap-2">
+              {activeFields.map((field) => (
+                <SortableFieldRow
+                  key={field.id}
+                  field={field}
+                  onConfigure={() => setDialog({ fieldType: field.fieldType, existing: field })}
+                  onRemove={() => {
+                    if (window.confirm(`Remove "${field.name}" from the log form?`)) archive.mutate({ fieldId: field.id })
+                  }}
+                />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
       )}
 
       {dialog && (
@@ -147,6 +128,57 @@ export function CustomLogBuilder({ domain, onChanged }: { domain: DomainForBuild
           onSaved={handleSaved}
         />
       )}
+    </div>
+  )
+}
+
+function SortableFieldRow({
+  field,
+  onConfigure,
+  onRemove,
+}: {
+  field: FieldWithConfig
+  onConfigure: () => void
+  onRemove: () => void
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: field.id })
+  const typeDef = getLogFieldTypeDef(field.fieldType)
+  const style = { transform: CSS.Transform.toString(transform), transition }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`flex items-center gap-1.5 rounded-lg border p-2 ${field.widthCols === 2 ? 'col-span-2' : 'col-span-1'} ${isDragging ? 'opacity-50' : ''}`}
+    >
+      <button
+        type="button"
+        {...attributes}
+        {...listeners}
+        className="cursor-grab touch-none text-muted-foreground/50 shrink-0 active:cursor-grabbing"
+        aria-label={`Reorder ${field.name}`}
+      >
+        <GripVertical className="h-3.5 w-3.5" />
+      </button>
+      <typeDef.icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+      <span className="text-sm truncate flex-1">
+        {field.name}
+        {field.unit ? ` (${field.unit})` : ''}
+        {field.required ? ' *' : ''}
+      </span>
+      <div className="flex items-center shrink-0">
+        <DropdownMenu>
+          <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="h-6 w-6" />}>
+            <MoreVertical className="h-3 w-3" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={onConfigure}>Configure</DropdownMenuItem>
+            <DropdownMenuItem variant="destructive" onClick={onRemove}>
+              <Archive className="h-3.5 w-3.5" /> Remove
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
     </div>
   )
 }

@@ -12,7 +12,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 import { CustomLogBuilder } from './CustomLogBuilder'
-import type { CustomDomainField, FieldType } from '@prisma/client'
+import type { FieldType } from '@prisma/client'
+import type { FieldWithConfig } from '@/server/domains/custom-domain/custom-domain.repository'
 
 const FIELD_TYPES: { value: FieldType; label: string }[] = [
   { value: 'TEXT', label: 'Text' },
@@ -103,7 +104,7 @@ function AddFieldForm({ customDomainId, onAdded }: { customDomainId: string; onA
   )
 }
 
-function DomainRow({ domain, onChanged }: { domain: { id: string; name: string; icon: string | null; fields: CustomDomainField[] }; onChanged: () => void }) {
+function DomainRow({ domain, onChanged }: { domain: { id: string; name: string; icon: string | null; fields: FieldWithConfig[] }; onChanged: () => void }) {
   const [expanded, setExpanded] = useState(false)
   const [showAddField, setShowAddField] = useState(false)
 
