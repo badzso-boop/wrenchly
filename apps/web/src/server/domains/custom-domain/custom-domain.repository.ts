@@ -10,8 +10,8 @@ import {
   Prisma,
 } from '@prisma/client'
 
-export type CustomDomainWithFields = CustomDomain & { fields: CustomDomainField[] }
 export type FieldWithConfig = CustomDomainField & { fieldConfig: CustomDomainFieldConfig | null }
+export type CustomDomainWithFields = CustomDomain & { fields: FieldWithConfig[] }
 export type EntryWithValues = CustomItemDataEntry & {
   values: (CustomDomainFieldValue & { field: CustomDomainField })[]
 }
@@ -22,7 +22,7 @@ export class CustomDomainRepository {
   async listByUserId(userId: string): Promise<CustomDomainWithFields[]> {
     return this.db.customDomain.findMany({
       where: { userId },
-      include: { fields: { orderBy: { order: 'asc' } } },
+      include: { fields: { orderBy: { order: 'asc' }, include: { fieldConfig: true } } },
       orderBy: { name: 'asc' },
     })
   }
@@ -30,7 +30,7 @@ export class CustomDomainRepository {
   async findById(id: string): Promise<CustomDomainWithFields | null> {
     return this.db.customDomain.findUnique({
       where: { id },
-      include: { fields: { orderBy: { order: 'asc' } } },
+      include: { fields: { orderBy: { order: 'asc' }, include: { fieldConfig: true } } },
     })
   }
 
