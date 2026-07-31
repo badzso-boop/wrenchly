@@ -18,6 +18,12 @@ const FIELD_TYPE_MAP: Record<FieldType, ProfileFieldType> = {
   BOOLEAN: 'boolean',
   ENUM: 'select',
   URL: 'text',
+  // LONG_TEXT/DECIMAL/RADIO/CHECKBOXES are new Log-tab-oriented widget types; mapped to the
+  // closest existing Profile-tab rendering for now (Profile tab itself is unchanged this phase)
+  LONG_TEXT: 'text',
+  DECIMAL: 'decimal',
+  RADIO: 'select',
+  CHECKBOXES: 'select',
 }
 
 function toFieldDef(field: CustomDomainField): ProfileFieldDef {
