@@ -5,18 +5,9 @@ import { type ItemRepository } from '@/server/domains/item/item.repository'
 import { type VehicleRepository } from '@/server/domains/vehicle/vehicle.repository'
 import { ReminderService } from '@/server/domains/reminder/reminder.service'
 import { type ReminderRepository } from '@/server/domains/reminder/reminder.repository'
-import { type PrismaClient, type TripLog, type TripFuelStop, type TripExpense, type TripExpenseType, type ItemType } from '@prisma/client'
+import { type PrismaClient, type TripLog, type TripExpense, type TripExpenseType, type ItemType } from '@prisma/client'
 
-type TripLogWithChildren = TripLog & { fuelStops: TripFuelStop[]; expenses: TripExpense[] }
-
-interface FuelStopInput {
-  quantity: number
-  unit: string
-  pricePerUnit: number
-  currency: string
-  fuelType?: string | null
-  station?: string | null
-}
+type TripLogWithChildren = TripLog & { expenses: TripExpense[] }
 
 interface ExpenseInput {
   type: TripExpenseType
@@ -34,12 +25,13 @@ export interface StatsBucket {
   elevationGainM: number
 }
 
-function calculateFuelTotals(fuelStops: FuelStopInput[]) {
-  const withTotals = fuelStops.map((f) => ({ ...f, totalPaid: f.quantity * f.pricePerUnit }))
-  const totalFuelQty = withTotals.reduce((sum, f) => sum + f.quantity, 0)
-  const totalFuelCost = withTotals.reduce((sum, f) => sum + f.totalPaid, 0)
-  return { withTotals, totalFuelQty, totalFuelCost }
-}
+// NOTE (fuel-up decoupling, fork 1 of 4 — minimum-to-compile pass only): fuel is no longer
+// entered through the trip domain at all (see the standalone FuelUp model + its own domain,
+// built by fork 2). totalFuelQty/totalFuelCost stay on TripLog for now but are never written by
+// create()/update() anymore, and getStatistics() below still reads them for OLD trips only (their
+// historical cached values survive the migration) — this is a known, temporary inconsistency:
+// aggregate()/consumptionTrend/currencies all still assume fuel lives on the trip. Rewiring all of
+// this to source from FuelUp (via the new N-N relation) is fork 2's job, not fixed here.
 
 function calculateExpenseTotal(expenses: ExpenseInput[]) {
   return expenses.reduce((sum, e) => sum + e.amount, 0)
@@ -103,7 +95,6 @@ export class TripService {
       elevationGainM?: number | null
       batteryPercentUsed?: number | null
       maxAltitudeM?: number | null
-      fuelStops?: FuelStopInput[]
       expenses?: ExpenseInput[]
     }
   ): Promise<TripLogWithChildren> {
@@ -116,7 +107,6 @@ export class TripService {
     const startOdometer = input.startOdometer ?? 0
     const distanceKm = input.distanceKm ?? 0
     const endOdometer = startOdometer + distanceKm
-    const { withTotals: fuelStops, totalFuelQty, totalFuelCost } = calculateFuelTotals(input.fuelStops ?? [])
     const expenses = input.expenses ?? []
     const totalExpenseCost = calculateExpenseTotal(expenses)
 
@@ -134,10 +124,9 @@ export class TripService {
       elevationGainM: input.elevationGainM,
       batteryPercentUsed: input.batteryPercentUsed,
       maxAltitudeM: input.maxAltitudeM,
-      totalFuelQty,
-      totalFuelCost,
+      totalFuelQty: 0,
+      totalFuelCost: 0,
       totalExpenseCost,
-      fuelStops,
       expenses,
     })
 
@@ -168,7 +157,6 @@ export class TripService {
       elevationGainM?: number | null
       batteryPercentUsed?: number | null
       maxAltitudeM?: number | null
-      fuelStops?: FuelStopInput[]
       expenses?: ExpenseInput[]
     }
   ): Promise<TripLogWithChildren> {
@@ -179,7 +167,7 @@ export class TripService {
     const distanceKm = input.distanceKm ?? existing.distanceKm
     const endOdometer = startOdometer + distanceKm
 
-    const { fuelStops, expenses, ...rest } = input
+    const { expenses, ...rest } = input
     const data: Parameters<TripRepository['update']>[1] = {
       ...rest,
       startOdometer,
@@ -187,12 +175,6 @@ export class TripService {
       endOdometer,
     }
 
-    if (fuelStops) {
-      const totals = calculateFuelTotals(fuelStops)
-      data.fuelStops = totals.withTotals
-      data.totalFuelQty = totals.totalFuelQty
-      data.totalFuelCost = totals.totalFuelCost
-    }
     if (expenses) {
       data.expenses = expenses
       data.totalExpenseCost = calculateExpenseTotal(expenses)
@@ -267,12 +249,14 @@ export class TripService {
       .filter((t) => t.batteryPercentUsed != null)
       .map((t) => ({ date: t.startedAt, batteryPercentUsed: t.batteryPercentUsed! }))
 
-    // From PR #7: which currencies actually appear across this item's fuel stops/expenses (only
-    // ever non-empty for VEHICLE/BOAT, the two types with cost tracking) — lets the UI show a
-    // real currency label, or flag mixed currencies, instead of a bare unlabeled number.
-    const currencies = Array.from(
-      new Set(trips.flatMap((t) => [...t.fuelStops.map((f) => f.currency), ...t.expenses.map((e) => e.currency)]))
-    )
+    // From PR #7: which currencies actually appear across this item's expenses (only ever
+    // non-empty for VEHICLE/BOAT) — lets the UI show a real currency label, or flag mixed
+    // currencies, instead of a bare unlabeled number.
+    // TEMPORARY (fuel-up decoupling, fork 1 of 4): fuel currencies dropped out of this set since
+    // fuel no longer lives on TripLog — fork 2 must add the FuelUp table's currencies back in
+    // here once its own domain/statistics rewrite lands, or this under-reports mixed currencies
+    // for any item whose only non-HUF spend was on fuel.
+    const currencies = Array.from(new Set(trips.flatMap((t) => t.expenses.map((e) => e.currency))))
 
     return {
       allTime,
