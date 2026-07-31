@@ -1,5 +1,5 @@
 import type { ItemType } from '@prisma/client'
-import { Car, Route, BarChart3, LineChart, Printer, Wallet, type LucideIcon } from 'lucide-react'
+import { Car, Route, BarChart3, LineChart, Printer, Wallet, ChefHat, Heart, type LucideIcon } from 'lucide-react'
 
 interface ExtraTabDef {
   hrefSuffix: string
@@ -73,10 +73,10 @@ const ITEM_TYPE_LOG_CONFIG: Partial<Record<ItemType, ExtraTabDef[]>> = {
     { hrefSuffix: '/print-jobs', label: 'Print Jobs', icon: Printer },
     { hrefSuffix: '/statistics', label: 'Statistics', icon: BarChart3 },
   ],
-  // More tabs (Cooking Log, Favorite Meals) get appended here by a later fork in this
-  // initiative — this array shape already supports it, no further registry changes needed.
   HOME: [
     { hrefSuffix: '/household-finance', label: 'Expenses & Income', icon: Wallet },
+    { hrefSuffix: '/cooking-log', label: 'Cooking Log', icon: ChefHat },
+    { hrefSuffix: '/favorite-meals', label: 'Favorite Meals', icon: Heart },
     { hrefSuffix: '/statistics', label: 'Statistics', icon: BarChart3 },
   ],
 }
