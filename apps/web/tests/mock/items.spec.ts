@@ -24,7 +24,7 @@ test.describe('Items (mock)', () => {
     await page.goto('/items/new')
     // Step 1 only asks for the type — Name lives on step 2 now.
     await expect(page.getByLabel(/name/i)).toHaveCount(0)
-    await page.getByRole('button', { name: /next/i }).click()
+    await page.getByRole('button', { name: 'Next', exact: true }).click()
 
     await expect(page.getByLabel(/^name/i)).toBeVisible()
     const saveBtn = page.getByRole('button', { name: /create/i })
@@ -38,7 +38,7 @@ test.describe('Items (mock)', () => {
     const typeSelect = page.getByRole('combobox').first()
     await typeSelect.click()
     await page.getByRole('option', { name: /vehicle/i }).click()
-    await page.getByRole('button', { name: /next/i }).click()
+    await page.getByRole('button', { name: 'Next', exact: true }).click()
 
     await page.getByLabel(/^name/i).fill('New Test Item')
     await page.locator('#make').fill('Toyota')
