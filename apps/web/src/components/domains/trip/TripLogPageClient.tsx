@@ -62,7 +62,7 @@ export function TripLogPageClient({ itemId }: { itemId: string }) {
           )}
 
           {trips.isLoading && <TripLogListSkeleton />}
-          {trips.data && item.data && <TripLogList trips={trips.data} itemType={item.data.type} />}
+          {trips.data && item.data && <TripLogList trips={trips.data} itemType={item.data.type} itemId={itemId} />}
         </div>
       </div>
     </div>

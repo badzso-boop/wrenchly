@@ -1,6 +1,6 @@
 'use client'
 import { api } from '@/lib/trpc/client'
-import { Trash2, ChevronDown, ChevronUp, Pencil, Plus, X } from 'lucide-react'
+import { Trash2, ChevronDown, ChevronUp, Pencil, Plus, X, Fuel } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -209,7 +209,7 @@ function EditTripLogForm({ trip, itemType, onDone }: { trip: TripWithChildren; i
   )
 }
 
-export function TripLogList({ trips, itemType }: { trips: TripWithChildren[]; itemType: ItemType }) {
+export function TripLogList({ trips, itemType, itemId }: { trips: TripWithChildren[]; itemType: ItemType; itemId: string }) {
   const utils = api.useUtils()
   const [expanded, setExpanded] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -220,6 +220,11 @@ export function TripLogList({ trips, itemType }: { trips: TripWithChildren[]; it
       utils.trip.getStatistics.invalidate()
     },
   })
+
+  // One query for every trip's fuel-up count, instead of a per-row lookup — avoids N+1. Only
+  // VEHICLE/BOAT track fuel at all.
+  const fuelUpTrips = api.fuelUp.listAssignableTrips.useQuery({ itemId }, { enabled: !!labels?.showFuelSection })
+  const fuelUpCountByTripId = new Map((fuelUpTrips.data ?? []).map((t) => [t.id, t.fuelUps.length]))
 
   if (!labels) return null
 
@@ -258,6 +263,12 @@ export function TripLogList({ trips, itemType }: { trips: TripWithChildren[]; it
                     {trip.batteryPercentUsed != null && <span>{trip.batteryPercentUsed}% battery</span>}
                     {totalCost > 0 && (
                       <span className="font-medium text-foreground">{totalCost.toLocaleString()}</span>
+                    )}
+                    {labels.showFuelSection && (fuelUpCountByTripId.get(trip.id) ?? 0) > 0 && (
+                      <span className="flex items-center gap-1 text-foreground">
+                        <Fuel className="h-3 w-3" />
+                        {fuelUpCountByTripId.get(trip.id)} fuel-up{(fuelUpCountByTripId.get(trip.id) ?? 0) > 1 ? 's' : ''}
+                      </span>
                     )}
                   </div>
                 </div>
