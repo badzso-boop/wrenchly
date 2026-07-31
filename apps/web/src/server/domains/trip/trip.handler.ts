@@ -5,15 +5,7 @@ import { TripService } from './trip.service'
 import { ItemRepository } from '@/server/domains/item/item.repository'
 import { VehicleRepository } from '@/server/domains/vehicle/vehicle.repository'
 import { ReminderRepository } from '@/server/domains/reminder/reminder.repository'
-
-const FuelStopInputSchema = z.object({
-  quantity: z.number().positive(),
-  unit: z.enum(['liter', 'kWh']).default('liter'),
-  pricePerUnit: z.number().nonnegative(),
-  currency: z.string().min(1).max(10).default('HUF'),
-  fuelType: z.string().max(50).optional(),
-  station: z.string().max(200).optional(),
-})
+import { FuelUpRepository } from '@/server/domains/fuel-up/fuel-up.repository'
 
 const ExpenseInputSchema = z.object({
   type: z.enum(['TOLL', 'VIGNETTE', 'PARKING', 'OTHER']),
@@ -27,7 +19,8 @@ function buildService(db: import('@prisma/client').PrismaClient) {
   const itemRepo = new ItemRepository(db)
   const vehicleRepo = new VehicleRepository(db)
   const reminderRepo = new ReminderRepository(db)
-  return new TripService(tripRepo, itemRepo, vehicleRepo, reminderRepo, db)
+  const fuelUpRepo = new FuelUpRepository(db)
+  return new TripService(tripRepo, itemRepo, vehicleRepo, reminderRepo, fuelUpRepo, db)
 }
 
 export const tripRouter = createTRPCRouter({
@@ -68,7 +61,6 @@ export const tripRouter = createTRPCRouter({
         elevationGainM: z.number().int().nonnegative().optional(),
         batteryPercentUsed: z.number().int().min(0).max(100).optional(),
         maxAltitudeM: z.number().int().nonnegative().optional(),
-        fuelStops: z.array(FuelStopInputSchema).optional(),
         expenses: z.array(ExpenseInputSchema).optional(),
       })
     )
@@ -91,7 +83,6 @@ export const tripRouter = createTRPCRouter({
         elevationGainM: z.number().int().nonnegative().optional(),
         batteryPercentUsed: z.number().int().min(0).max(100).optional(),
         maxAltitudeM: z.number().int().nonnegative().optional(),
-        fuelStops: z.array(FuelStopInputSchema).optional(),
         expenses: z.array(ExpenseInputSchema).optional(),
       })
     )

@@ -236,8 +236,8 @@ export function TripStatisticsClient({ itemId, itemType }: { itemId: string; ite
 
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Consumption per entry ({consumptionUnit})</CardTitle>
-          <CardDescription>Your fuel efficiency over time — a rising trend can mean it's time for a maintenance check, or just more demanding use.</CardDescription>
+          <CardTitle className="text-base">Consumption per fill-up ({consumptionUnit})</CardTitle>
+          <CardDescription>Your fuel efficiency over time, one point per fill-up (covering however many trips it fueled) — a rising trend can mean it's time for a maintenance check, or just more demanding use.</CardDescription>
         </CardHeader>
         <CardContent>
           <LineChart

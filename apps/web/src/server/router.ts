@@ -17,6 +17,7 @@ import { printJobRouter } from '@/server/domains/printjob/printjob.handler'
 import { householdFinanceRouter } from '@/server/domains/household-finance/household-finance.handler'
 import { cookingRouter } from '@/server/domains/cooking/cooking.handler'
 import { favoriteMealRouter } from '@/server/domains/favorite-meal/favorite-meal.handler'
+import { fuelUpRouter } from '@/server/domains/fuel-up/fuel-up.handler'
 
 export const appRouter = createTRPCRouter({
   item: itemRouter,
@@ -37,6 +38,7 @@ export const appRouter = createTRPCRouter({
   householdFinance: householdFinanceRouter,
   cooking: cookingRouter,
   favoriteMeal: favoriteMealRouter,
+  fuelUp: fuelUpRouter,
 })
 
 export type AppRouter = typeof appRouter

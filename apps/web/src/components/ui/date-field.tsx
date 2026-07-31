@@ -22,14 +22,14 @@ export function DateField({
   const today = todayIso()
 
   return (
-    <div className={cn('flex gap-1.5', className)}>
+    <div className={cn('flex gap-1.5 min-w-0', className)}>
       <Input
         id={id}
         type="date"
         value={value}
         onChange={(e) => onChange((e.target as HTMLInputElement).value)}
         required={required}
-        className="flex-1"
+        className="flex-1 min-w-0"
       />
       <Button
         type="button"

@@ -1,6 +1,6 @@
 'use client'
 import { api } from '@/lib/trpc/client'
-import { Trash2, ChevronDown, ChevronUp, Pencil, Plus, X } from 'lucide-react'
+import { Trash2, ChevronDown, ChevronUp, Pencil, Plus, X, Fuel } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -11,11 +11,10 @@ import { DateField } from '@/components/ui/date-field'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { FUEL_TYPES } from '@/components/domains/vehicle/VehicleProfileClient'
 import { getTripLogLabels } from '@/server/domains/trip/trip.labels'
-import type { TripLog, TripFuelStop, TripExpense, ItemType } from '@prisma/client'
+import type { TripLog, TripExpense, ItemType } from '@prisma/client'
 
-type TripWithChildren = TripLog & { fuelStops: TripFuelStop[]; expenses: TripExpense[] }
+type TripWithChildren = TripLog & { expenses: TripExpense[] }
 
 const CURRENCIES = ['HUF', 'EUR', 'USD', 'GBP', 'CHF']
 
@@ -26,28 +25,11 @@ const EXPENSE_TYPES: { value: 'TOLL' | 'VIGNETTE' | 'PARKING' | 'OTHER'; label: 
   { value: 'OTHER', label: 'Other' },
 ]
 
-interface FuelStopForm {
-  quantity: string
-  unit: 'liter' | 'kWh'
-  pricePerUnit: string
-  currency: string
-  fuelType: string
-  station: string
-}
-
 interface ExpenseForm {
   type: 'TOLL' | 'VIGNETTE' | 'PARKING' | 'OTHER'
   amount: string
   currency: string
   description: string
-}
-
-function consumptionLabel(trip: TripWithChildren, itemType: ItemType): string | null {
-  const fuelQty = Number(trip.totalFuelQty)
-  if (fuelQty <= 0 || trip.distanceKm <= 0) return null
-  const divisor = itemType === 'BOAT' ? trip.distanceKm : trip.distanceKm / 100
-  const unit = itemType === 'BOAT' ? 'L/hour' : 'L/100km'
-  return `${(fuelQty / divisor).toFixed(1)} ${unit}`
 }
 
 function EditTripLogForm({ trip, itemType, onDone }: { trip: TripWithChildren; itemType: ItemType; onDone: () => void }) {
@@ -63,16 +45,6 @@ function EditTripLogForm({ trip, itemType, onDone }: { trip: TripWithChildren; i
   const [description, setDescription] = useState(trip.description ?? '')
   const [notes, setNotes] = useState(trip.notes ?? '')
   const [startFuelLiters, setStartFuelLiters] = useState(trip.startFuelLiters?.toString() ?? '')
-  const [fuelStops, setFuelStops] = useState<FuelStopForm[]>(
-    trip.fuelStops.map((f) => ({
-      quantity: String(f.quantity),
-      unit: f.unit as 'liter' | 'kWh',
-      pricePerUnit: String(f.pricePerUnit),
-      currency: f.currency,
-      fuelType: f.fuelType ?? '',
-      station: f.station ?? '',
-    }))
-  )
   const [expenses, setExpenses] = useState<ExpenseForm[]>(
     trip.expenses.map((e) => ({
       type: e.type,
@@ -90,16 +62,6 @@ function EditTripLogForm({ trip, itemType, onDone }: { trip: TripWithChildren; i
       onDone()
     },
   })
-
-  function addFuelStop() {
-    setFuelStops([...fuelStops, { quantity: '', unit: 'liter', pricePerUnit: '', currency: 'HUF', fuelType: '', station: '' }])
-  }
-  function updateFuelStop(index: number, field: keyof FuelStopForm, value: string) {
-    setFuelStops(fuelStops.map((f, i) => (i === index ? { ...f, [field]: value } : f)))
-  }
-  function removeFuelStop(index: number) {
-    setFuelStops(fuelStops.filter((_, i) => i !== index))
-  }
 
   function addExpense() {
     setExpenses([...expenses, { type: 'TOLL', amount: '', currency: 'HUF', description: '' }])
@@ -127,16 +89,6 @@ function EditTripLogForm({ trip, itemType, onDone }: { trip: TripWithChildren; i
       batteryPercentUsed: batteryPercentUsed ? Number(batteryPercentUsed) : undefined,
       maxAltitudeM: maxAltitudeM ? Number(maxAltitudeM) : undefined,
       startFuelLiters: startFuelLiters ? Number(startFuelLiters) : undefined,
-      fuelStops: fuelStops
-        .filter((f) => f.quantity && f.pricePerUnit)
-        .map((f) => ({
-          quantity: Number(f.quantity),
-          unit: f.unit,
-          pricePerUnit: Number(f.pricePerUnit),
-          currency: f.currency,
-          fuelType: f.fuelType || undefined,
-          station: f.station || undefined,
-        })),
       expenses: expenses
         .filter((ex) => ex.amount)
         .map((ex) => ({
@@ -205,54 +157,8 @@ function EditTripLogForm({ trip, itemType, onDone }: { trip: TripWithChildren; i
             <Input id={`edit-trip-start-fuel-${trip.id}`} type="number" value={startFuelLiters} onChange={(e) => setStartFuelLiters((e.target as HTMLInputElement).value)} min="0" />
           </div>
 
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <Label>Fuel Stops</Label>
-              <Button type="button" variant="ghost" size="sm" onClick={addFuelStop} className="h-7 text-xs">
-                <Plus className="h-3 w-3 mr-1" /> Add Fuel Stop
-              </Button>
-            </div>
-            {fuelStops.map((stop, i) => {
-              const total = (Number(stop.quantity) || 0) * (Number(stop.pricePerUnit) || 0)
-              return (
-                <div key={i} className="rounded-lg border p-3 mb-2 space-y-2">
-                  <div className="grid grid-cols-4 gap-2">
-                    <Input type="number" value={stop.quantity} onChange={(e) => updateFuelStop(i, 'quantity', (e.target as HTMLInputElement).value)} placeholder="Qty" min="0" step="0.01" className="h-8 text-sm" />
-                    <Select value={stop.unit} onValueChange={(v) => { if (v !== null) updateFuelStop(i, 'unit', v) }}>
-                      <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="liter">liter</SelectItem>
-                        <SelectItem value="kWh">kWh</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Input type="number" value={stop.pricePerUnit} onChange={(e) => updateFuelStop(i, 'pricePerUnit', (e.target as HTMLInputElement).value)} placeholder="Price/unit" min="0" className="h-8 text-sm" />
-                    <Select value={stop.currency} onValueChange={(v) => { if (v !== null) updateFuelStop(i, 'currency', v) }}>
-                      <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {CURRENCIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="grid grid-cols-4 gap-2 items-center">
-                    <Select value={stop.fuelType || 'none'} onValueChange={(v) => { if (v !== null) updateFuelStop(i, 'fuelType', v === 'none' ? '' : v) }}>
-                      <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Fuel type" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Fuel type</SelectItem>
-                        {FUEL_TYPES.map((ft) => <SelectItem key={ft} value={ft}>{ft}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    <Input value={stop.station} onChange={(e) => updateFuelStop(i, 'station', (e.target as HTMLInputElement).value)} placeholder="Station (optional)" className="h-8 text-sm col-span-2" />
-                    <div className="flex items-center justify-end gap-1">
-                      <span className="text-xs text-muted-foreground tabular-nums">{total.toLocaleString()} {stop.currency}</span>
-                      <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => removeFuelStop(i)}>
-                        <X className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
+          {/* Fuel is no longer entered per-trip — see the standalone Fuel-ups feature (fork 2/3
+              of the fuel-up decoupling initiative) once it lands. */}
 
           <div>
             <div className="flex items-center justify-between mb-2">
@@ -262,22 +168,22 @@ function EditTripLogForm({ trip, itemType, onDone }: { trip: TripWithChildren; i
               </Button>
             </div>
             {expenses.map((ex, i) => (
-              <div key={i} className="grid grid-cols-5 gap-2 mb-2 items-center">
+              <div key={i} className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-2 sm:items-center">
                 <Select value={ex.type} onValueChange={(v) => { if (v !== null) updateExpense(i, 'type', v) }}>
                   <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {EXPENSE_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
                   </SelectContent>
                 </Select>
-                <Input type="number" value={ex.amount} onChange={(e) => updateExpense(i, 'amount', (e.target as HTMLInputElement).value)} placeholder="Amount" min="0" className="h-8 text-sm" />
+                <Input type="number" value={ex.amount} onChange={(e) => updateExpense(i, 'amount', (e.target as HTMLInputElement).value)} placeholder="Amount" min="0" className="h-8 text-sm min-w-0" />
                 <Select value={ex.currency} onValueChange={(v) => { if (v !== null) updateExpense(i, 'currency', v) }}>
                   <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {CURRENCIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                   </SelectContent>
                 </Select>
-                <Input value={ex.description} onChange={(e) => updateExpense(i, 'description', (e.target as HTMLInputElement).value)} placeholder="Note" className="h-8 text-sm" />
-                <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive justify-self-end" onClick={() => removeExpense(i)}>
+                <Input value={ex.description} onChange={(e) => updateExpense(i, 'description', (e.target as HTMLInputElement).value)} placeholder="Note" className="h-8 text-sm min-w-0" />
+                <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive justify-self-end col-span-2 sm:col-span-1" onClick={() => removeExpense(i)}>
                   <X className="h-3.5 w-3.5" />
                 </Button>
               </div>
@@ -303,7 +209,7 @@ function EditTripLogForm({ trip, itemType, onDone }: { trip: TripWithChildren; i
   )
 }
 
-export function TripLogList({ trips, itemType }: { trips: TripWithChildren[]; itemType: ItemType }) {
+export function TripLogList({ trips, itemType, itemId }: { trips: TripWithChildren[]; itemType: ItemType; itemId: string }) {
   const utils = api.useUtils()
   const [expanded, setExpanded] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -314,6 +220,11 @@ export function TripLogList({ trips, itemType }: { trips: TripWithChildren[]; it
       utils.trip.getStatistics.invalidate()
     },
   })
+
+  // One query for every trip's fuel-up count, instead of a per-row lookup — avoids N+1. Only
+  // VEHICLE/BOAT track fuel at all.
+  const fuelUpTrips = api.fuelUp.listAssignableTrips.useQuery({ itemId }, { enabled: !!labels?.showFuelSection })
+  const fuelUpCountByTripId = new Map((fuelUpTrips.data ?? []).map((t) => [t.id, t.fuelUps.length]))
 
   if (!labels) return null
 
@@ -331,8 +242,7 @@ export function TripLogList({ trips, itemType }: { trips: TripWithChildren[]; it
     <div className="space-y-2">
       {trips.map((trip) => {
         const isExpanded = expanded === trip.id
-        const consumption = consumptionLabel(trip, itemType)
-        const totalCost = Number(trip.totalFuelCost) + Number(trip.totalExpenseCost)
+        const totalCost = Number(trip.totalExpenseCost)
         const distanceUnit = labels.distanceFieldLabel.toLowerCase().includes('hour') ? 'h' : 'km'
 
         return (
@@ -345,11 +255,6 @@ export function TripLogList({ trips, itemType }: { trips: TripWithChildren[]; it
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-0.5 flex-wrap">
                     <span className="font-medium text-sm truncate">{trip.description || 'Trip'}</span>
-                    {consumption && (
-                      <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-primary/10 text-primary shrink-0">
-                        {consumption}
-                      </span>
-                    )}
                   </div>
                   <div className="flex items-center gap-3 text-xs text-muted-foreground">
                     <span>{new Date(trip.startedAt).toLocaleDateString()}</span>
@@ -358,6 +263,12 @@ export function TripLogList({ trips, itemType }: { trips: TripWithChildren[]; it
                     {trip.batteryPercentUsed != null && <span>{trip.batteryPercentUsed}% battery</span>}
                     {totalCost > 0 && (
                       <span className="font-medium text-foreground">{totalCost.toLocaleString()}</span>
+                    )}
+                    {labels.showFuelSection && (fuelUpCountByTripId.get(trip.id) ?? 0) > 0 && (
+                      <span className="flex items-center gap-1 text-foreground">
+                        <Fuel className="h-3 w-3" />
+                        {fuelUpCountByTripId.get(trip.id)} fuel-up{(fuelUpCountByTripId.get(trip.id) ?? 0) > 1 ? 's' : ''}
+                      </span>
                     )}
                   </div>
                 </div>
@@ -399,19 +310,8 @@ export function TripLogList({ trips, itemType }: { trips: TripWithChildren[]; it
                     )}
                   </div>
                   {trip.notes && <p className="text-sm text-muted-foreground pt-3">{trip.notes}</p>}
-                  {trip.fuelStops.length > 0 && (
-                    <div className="pt-3">
-                      <p className="text-xs font-medium text-muted-foreground mb-2">Fuel stops</p>
-                      <div className="space-y-1">
-                        {trip.fuelStops.map((f) => (
-                          <div key={f.id} className="flex items-center justify-between text-sm">
-                            <span>{Number(f.quantity)} {f.unit}{f.fuelType ? ` (${f.fuelType})` : ''}{f.station ? ` — ${f.station}` : ''}</span>
-                            <span className="text-muted-foreground">{Number(f.totalPaid).toLocaleString()} {f.currency}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                  {/* Fuel stops used to display here — moved to the standalone Fuel-ups feature
+                      (fork 3 of the fuel-up decoupling initiative). */}
                   {trip.expenses.length > 0 && (
                     <div className="pt-3">
                       <p className="text-xs font-medium text-muted-foreground mb-2">Tolls, vignettes &amp; parking</p>

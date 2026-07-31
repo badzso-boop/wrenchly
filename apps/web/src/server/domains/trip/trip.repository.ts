@@ -1,6 +1,6 @@
-import { type PrismaClient, type TripLog, type TripFuelStop, type TripExpense } from '@prisma/client'
+import { type PrismaClient, type TripLog, type TripExpense } from '@prisma/client'
 
-type TripLogWithChildren = TripLog & { fuelStops: TripFuelStop[]; expenses: TripExpense[] }
+type TripLogWithChildren = TripLog & { expenses: TripExpense[] }
 
 export class TripRepository {
   constructor(private db: PrismaClient) {}
@@ -8,7 +8,7 @@ export class TripRepository {
   async findByIdAndUserId(id: string, userId: string): Promise<TripLogWithChildren | null> {
     return this.db.tripLog.findFirst({
       where: { id, userId },
-      include: { fuelStops: true, expenses: true },
+      include: { expenses: true },
     })
   }
 
@@ -20,7 +20,7 @@ export class TripRepository {
   ): Promise<TripLogWithChildren[]> {
     return this.db.tripLog.findMany({
       where: { itemId, userId },
-      include: { fuelStops: true, expenses: true },
+      include: { expenses: true },
       orderBy: { startedAt: 'desc' },
       take: limit,
       ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
@@ -30,7 +30,7 @@ export class TripRepository {
   async findAllByItemId(itemId: string, userId: string): Promise<TripLogWithChildren[]> {
     return this.db.tripLog.findMany({
       where: { itemId, userId },
-      include: { fuelStops: true, expenses: true },
+      include: { expenses: true },
       orderBy: { startedAt: 'asc' },
     })
   }
@@ -45,22 +45,11 @@ export class TripRepository {
     distanceKm: number
     endOdometer: number
     startFuelLiters?: number | null
-    totalFuelQty: number
-    totalFuelCost: number
     totalExpenseCost: number
     durationMin?: number | null
     elevationGainM?: number | null
     batteryPercentUsed?: number | null
     maxAltitudeM?: number | null
-    fuelStops?: Array<{
-      quantity: number
-      unit: string
-      pricePerUnit: number
-      totalPaid: number
-      currency: string
-      fuelType?: string | null
-      station?: string | null
-    }>
     expenses?: Array<{
       type: 'TOLL' | 'VIGNETTE' | 'PARKING' | 'OTHER'
       amount: number
@@ -68,14 +57,13 @@ export class TripRepository {
       description?: string | null
     }>
   }): Promise<TripLogWithChildren> {
-    const { fuelStops, expenses, ...trip } = data
+    const { expenses, ...trip } = data
     return this.db.tripLog.create({
       data: {
         ...trip,
-        fuelStops: fuelStops ? { create: fuelStops } : undefined,
         expenses: expenses ? { create: expenses } : undefined,
       },
-      include: { fuelStops: true, expenses: true },
+      include: { expenses: true },
     })
   }
 
@@ -89,22 +77,11 @@ export class TripRepository {
       distanceKm?: number
       endOdometer?: number
       startFuelLiters?: number | null
-      totalFuelQty?: number
-      totalFuelCost?: number
       totalExpenseCost?: number
       durationMin?: number | null
       elevationGainM?: number | null
       batteryPercentUsed?: number | null
       maxAltitudeM?: number | null
-      fuelStops?: Array<{
-        quantity: number
-        unit: string
-        pricePerUnit: number
-        totalPaid: number
-        currency: string
-        fuelType?: string | null
-        station?: string | null
-      }>
       expenses?: Array<{
         type: 'TOLL' | 'VIGNETTE' | 'PARKING' | 'OTHER'
         amount: number
@@ -113,17 +90,16 @@ export class TripRepository {
       }>
     }
   ): Promise<TripLogWithChildren> {
-    const { fuelStops, expenses, ...trip } = data
+    const { expenses, ...trip } = data
     return this.db.tripLog.update({
       where: { id },
       data: {
         ...trip,
         // Full replace: simpler and safer than diffing individual rows, mirrors how
         // maintenance.repository.ts handles parts on update.
-        fuelStops: fuelStops ? { deleteMany: {}, create: fuelStops } : undefined,
         expenses: expenses ? { deleteMany: {}, create: expenses } : undefined,
       },
-      include: { fuelStops: true, expenses: true },
+      include: { expenses: true },
     })
   }
 
