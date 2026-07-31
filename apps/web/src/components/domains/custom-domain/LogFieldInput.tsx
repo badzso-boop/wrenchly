@@ -6,8 +6,20 @@ import { DateField } from '@/components/ui/date-field'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { FieldWithConfig } from '@/server/domains/custom-domain/custom-domain.repository'
+import type { CustomDomainFieldValue } from '@prisma/client'
 
 export type LogFieldValues = Record<string, unknown>
+
+/** Converts a persisted `CustomDomainFieldValue` row (one nullable typed column set) back into
+ * the plain JS value `LogFieldInput`/`formatLogFieldValue` expect. */
+export function extractRawValue(value: CustomDomainFieldValue): unknown {
+  if (value.valueString !== null) return value.valueString
+  if (value.valueNumber !== null) return Number(value.valueNumber)
+  if (value.valueBoolean !== null) return value.valueBoolean
+  if (value.valueDate !== null) return new Date(value.valueDate).toISOString().slice(0, 10)
+  if (value.valueJson !== null) return value.valueJson
+  return undefined
+}
 
 /** Renders the real widget for one loggable field, reading/writing `values[field.key]`.
  * Mirrors (but doesn't duplicate) the server's `validateFieldValue` shape expectations --

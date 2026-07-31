@@ -8,18 +8,8 @@ import { Label } from '@/components/ui/label'
 import { DateField } from '@/components/ui/date-field'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { LogFieldInput, formatLogFieldValue, type LogFieldValues } from './LogFieldInput'
+import { LogFieldInput, formatLogFieldValue, extractRawValue, type LogFieldValues } from './LogFieldInput'
 import type { FieldWithConfig, EntryWithValues } from '@/server/domains/custom-domain/custom-domain.repository'
-import type { CustomDomainFieldValue } from '@prisma/client'
-
-function extractRawValue(value: CustomDomainFieldValue): unknown {
-  if (value.valueString !== null) return value.valueString
-  if (value.valueNumber !== null) return Number(value.valueNumber)
-  if (value.valueBoolean !== null) return value.valueBoolean
-  if (value.valueDate !== null) return new Date(value.valueDate).toISOString().slice(0, 10)
-  if (value.valueJson !== null) return value.valueJson
-  return undefined
-}
 
 function entryToValues(entry: EntryWithValues): LogFieldValues {
   const values: LogFieldValues = {}

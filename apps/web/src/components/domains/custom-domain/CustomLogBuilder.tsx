@@ -37,7 +37,15 @@ interface DomainForBuilder {
   fields: FieldWithConfig[]
 }
 
-export function CustomLogBuilder({ domain, onChanged }: { domain: DomainForBuilder; onChanged: () => void }) {
+export function CustomLogBuilder({
+  domain,
+  onChanged,
+  isPublished = false,
+}: {
+  domain: DomainForBuilder
+  onChanged: () => void
+  isPublished?: boolean
+}) {
   const utils = api.useUtils()
   const [dialog, setDialog] = useState<{ fieldType: FieldType; existing?: FieldWithConfig } | null>(null)
   const sensors = useSensors(
@@ -83,22 +91,26 @@ export function CustomLogBuilder({ domain, onChanged }: { domain: DomainForBuild
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <p className="text-sm font-medium">Log form</p>
-        <DropdownMenu>
-          <DropdownMenuTrigger render={<Button variant="outline" size="icon-sm" className="rounded-full" />}>
-            <Plus className="h-4 w-4" />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            {LOG_FIELD_TYPES.map((t) => (
-              <DropdownMenuItem key={t.value} onClick={() => setDialog({ fieldType: t.value })}>
-                <t.icon className="h-3.5 w-3.5" /> {t.label}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {!isPublished && (
+          <DropdownMenu>
+            <DropdownMenuTrigger render={<Button variant="outline" size="icon-sm" className="rounded-full" />}>
+              <Plus className="h-4 w-4" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {LOG_FIELD_TYPES.map((t) => (
+                <DropdownMenuItem key={t.value} onClick={() => setDialog({ fieldType: t.value })}>
+                  <t.icon className="h-3.5 w-3.5" /> {t.label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
 
       {activeFields.length === 0 ? (
         <p className="text-sm text-muted-foreground">No log fields yet — add one with the + button above.</p>
+      ) : isPublished ? (
+        <FieldLayoutPreview fields={activeFields} />
       ) : (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={activeFields.map((f) => f.id)} strategy={rectSortingStrategy}>
@@ -118,7 +130,7 @@ export function CustomLogBuilder({ domain, onChanged }: { domain: DomainForBuild
         </DndContext>
       )}
 
-      {dialog && (
+      {!isPublished && dialog && (
         <LoggableFieldDialog
           open={!!dialog}
           onOpenChange={(open) => { if (!open) setDialog(null) }}
@@ -128,6 +140,32 @@ export function CustomLogBuilder({ domain, onChanged }: { domain: DomainForBuild
           onSaved={handleSaved}
         />
       )}
+    </div>
+  )
+}
+
+/** Non-interactive field-layout preview, reused by the Store page for domains the viewer doesn't
+ * own (and here for a domain's own canvas once it's published and locked). Same grid math as
+ * `SortableFieldRow`, just without drag/configure/remove affordances. */
+export function ReadOnlyFieldRow({ field }: { field: Pick<FieldWithConfig, 'id' | 'name' | 'unit' | 'required' | 'fieldType' | 'widthCols'> }) {
+  const typeDef = getLogFieldTypeDef(field.fieldType)
+  return (
+    <div className={`flex items-center gap-1.5 rounded-lg border p-2 ${field.widthCols === 2 ? 'col-span-2' : 'col-span-1'}`}>
+      <typeDef.icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+      <span className="text-sm truncate flex-1">
+        {field.name}
+        {field.unit ? ` (${field.unit})` : ''}
+        {field.required ? ' *' : ''}
+      </span>
+    </div>
+  )
+}
+
+export function FieldLayoutPreview({ fields }: { fields: Pick<FieldWithConfig, 'id' | 'name' | 'unit' | 'required' | 'fieldType' | 'widthCols'>[] }) {
+  if (fields.length === 0) return <p className="text-sm text-muted-foreground">No log fields.</p>
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      {fields.map((field) => <ReadOnlyFieldRow key={field.id} field={field} />)}
     </div>
   )
 }

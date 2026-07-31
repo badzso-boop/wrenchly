@@ -2,7 +2,8 @@
 import { api } from '@/lib/trpc/client'
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { Trash2, Plus, ChevronDown, ChevronUp } from 'lucide-react'
+import { Trash2, Plus, ChevronDown, ChevronUp, Rocket, Store, BookMarked } from 'lucide-react'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -104,17 +105,34 @@ function AddFieldForm({ customDomainId, onAdded }: { customDomainId: string; onA
   )
 }
 
-function DomainRow({ domain, onChanged }: { domain: { id: string; name: string; icon: string | null; fields: FieldWithConfig[] }; onChanged: () => void }) {
+interface DomainForRow {
+  id: string
+  name: string
+  icon: string | null
+  fields: FieldWithConfig[]
+  isPublished: boolean
+  publishedAt: Date | null
+}
+
+function DomainRow({ domain, onChanged }: { domain: DomainForRow; onChanged: () => void }) {
   const [expanded, setExpanded] = useState(false)
   const [showAddField, setShowAddField] = useState(false)
 
   const removeField = api.customDomain.removeField.useMutation({
     onSuccess: () => { toast.success('Field removed'); onChanged() },
+    onError: (err) => toast.error(err.message),
   })
   const deleteDomain = api.customDomain.delete.useMutation({
     onSuccess: () => { toast.success('Domain deleted'); onChanged() },
     onError: (err) => toast.error(err.message),
   })
+  const publish = api.customDomainLog.publish.useMutation({
+    onSuccess: () => { toast.success('Domain published to the store'); onChanged() },
+    onError: (err) => toast.error(err.message),
+  })
+
+  const loggableFieldCount = domain.fields.filter((f) => f.loggable && !f.archivedAt).length
+  const isPublished = domain.isPublished
 
   return (
     <div className="rounded-lg border">
@@ -127,47 +145,79 @@ function DomainRow({ domain, onChanged }: { domain: { id: string; name: string; 
           {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           <span className="font-medium text-sm">{domain.icon ? `${domain.icon} ` : ''}{domain.name}</span>
           <span className="text-xs text-muted-foreground">({domain.fields.length} fields)</span>
+          {isPublished && (
+            <span className="text-xs rounded-full bg-primary/10 text-primary px-2 py-0.5">Published</span>
+          )}
         </button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7"
-          onClick={() => { if (window.confirm(`Delete "${domain.name}"?`)) deleteDomain.mutate({ id: domain.id }) }}
-        >
-          <Trash2 className="h-3.5 w-3.5 text-destructive" />
-        </Button>
+        <div className="flex items-center gap-1">
+          {!isPublished && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              disabled={publish.isPending || loggableFieldCount === 0}
+              title={loggableFieldCount === 0 ? 'Add at least one log field before publishing' : 'Publish to the store'}
+              onClick={() => {
+                if (window.confirm(`Publish "${domain.name}" to the store? Its field structure will be locked afterward.`)) {
+                  publish.mutate({ customDomainId: domain.id })
+                }
+              }}
+            >
+              <Rocket className="h-3.5 w-3.5" />
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={() => { if (window.confirm(`Delete "${domain.name}"?`)) deleteDomain.mutate({ id: domain.id }) }}
+          >
+            <Trash2 className="h-3.5 w-3.5 text-destructive" />
+          </Button>
+        </div>
       </div>
 
       {expanded && (
         <div className="px-3 pb-3 space-y-4">
+          {isPublished && (
+            <p className="text-xs text-muted-foreground">
+              Published{domain.publishedAt ? ` on ${new Date(domain.publishedAt).toLocaleDateString()}` : ''} — field
+              structure is locked. Edit sample data from{' '}
+              <Link href="/custom-domains/published" className="underline">My published domains</Link>.
+            </p>
+          )}
           <Separator />
           <div className="space-y-2">
             <p className="text-sm font-medium">Profile fields</p>
             {domain.fields.filter((f) => !f.loggable).map((field) => (
               <div key={field.id} className="flex items-center justify-between text-sm py-1">
                 <span>{field.name}{field.unit ? ` (${field.unit})` : ''}{field.required ? ' *' : ''}</span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6"
-                  onClick={() => removeField.mutate({ fieldId: field.id })}
-                >
-                  <Trash2 className="h-3 w-3 text-muted-foreground" />
-                </Button>
+                {!isPublished && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={() => removeField.mutate({ fieldId: field.id })}
+                  >
+                    <Trash2 className="h-3 w-3 text-muted-foreground" />
+                  </Button>
+                )}
               </div>
             ))}
 
-            {showAddField ? (
-              <AddFieldForm customDomainId={domain.id} onAdded={() => { setShowAddField(false); onChanged() }} />
-            ) : (
-              <Button variant="outline" size="sm" onClick={() => setShowAddField(true)}>
-                <Plus className="h-3.5 w-3.5 mr-1" /> Add field
-              </Button>
+            {!isPublished && (
+              showAddField ? (
+                <AddFieldForm customDomainId={domain.id} onAdded={() => { setShowAddField(false); onChanged() }} />
+              ) : (
+                <Button variant="outline" size="sm" onClick={() => setShowAddField(true)}>
+                  <Plus className="h-3.5 w-3.5 mr-1" /> Add field
+                </Button>
+              )
             )}
           </div>
 
           <Separator />
-          <CustomLogBuilder domain={domain} onChanged={onChanged} />
+          <CustomLogBuilder domain={domain} onChanged={onChanged} isPublished={isPublished} />
         </div>
       )}
     </div>
@@ -193,6 +243,14 @@ export function CustomDomainManager() {
       <CardHeader className="pb-2">
         <CardTitle className="text-base">Custom Domains</CardTitle>
         <CardDescription>Define your own item types with custom fields</CardDescription>
+        <div className="flex gap-2 pt-1">
+          <Button variant="outline" size="sm" render={<Link href="/custom-domains/store" />}>
+            <Store className="h-3.5 w-3.5 mr-1" /> Store
+          </Button>
+          <Button variant="outline" size="sm" render={<Link href="/custom-domains/published" />}>
+            <BookMarked className="h-3.5 w-3.5 mr-1" /> My published domains
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="space-y-3">
         {domains.isLoading && <Skeleton className="h-16 w-full" />}
