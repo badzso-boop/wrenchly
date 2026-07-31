@@ -13,7 +13,6 @@ import { Switch } from '@/components/ui/switch'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
-import { CustomDomainManager } from '@/components/domains/custom-domain/CustomDomainManager'
 
 const TIMEZONES = [
   'Europe/Budapest', 'Europe/London', 'Europe/Berlin', 'Europe/Paris',
@@ -265,8 +264,6 @@ export function SettingsClient() {
               )}
             </CardContent>
           </Card>
-
-          <CustomDomainManager />
 
           {/* Account */}
           <Card>

@@ -69,7 +69,7 @@ export function PublishedDomainsClient() {
   return (
     <div className="flex flex-col h-full">
       <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6 py-4 flex items-center gap-3">
-        <Button variant="ghost" size="icon" className="h-8 w-8" render={<Link href="/settings" />} nativeButton={false}>
+        <Button variant="ghost" size="icon" className="h-8 w-8" render={<Link href="/custom-domains" />} nativeButton={false}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>

@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Wrench, Package, Bell, Settings, Menu } from 'lucide-react'
+import { LayoutDashboard, Wrench, Package, Bell, Settings, Menu, Blocks, Store, BookMarked } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { api } from '@/lib/trpc/client'
 import { ThemeToggle } from './ThemeToggle'
@@ -13,13 +13,13 @@ const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/items', label: 'My Items', icon: Wrench },
   { href: '/inventory', label: 'Inventory', icon: Package },
+  { href: '/custom-domains', label: 'Custom Domains', icon: Blocks },
+  { href: '/custom-domains/store', label: 'Store', icon: Store },
+  { href: '/custom-domains/published', label: 'My Published', icon: BookMarked },
   { href: '/notifications', label: 'Notifications', icon: Bell },
 ]
 
-function NavLink({ href, label, icon: Icon, unreadCount }: { href: string; label: string; icon: React.ElementType; unreadCount?: number }) {
-  const pathname = usePathname()
-  const isActive = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
-
+function NavLink({ href, label, icon: Icon, unreadCount, isActive }: { href: string; label: string; icon: React.ElementType; unreadCount?: number; isActive: boolean }) {
   return (
     <Link
       href={href}
@@ -43,6 +43,10 @@ function NavLink({ href, label, icon: Icon, unreadCount }: { href: string; label
 
 function SidebarContent() {
   const unread = api.notification.countUnread.useQuery(undefined, { refetchInterval: 60_000 })
+  const pathname = usePathname()
+  const activeHref = navItems
+    .filter((item) => item.href === '/dashboard' ? pathname === item.href : (pathname === item.href || pathname.startsWith(item.href + '/')))
+    .sort((a, b) => b.href.length - a.href.length)[0]?.href
 
   return (
     <div className="flex h-full flex-col bg-sidebar">
@@ -60,6 +64,7 @@ function SidebarContent() {
           <NavLink
             key={item.href}
             {...item}
+            isActive={item.href === activeHref}
             unreadCount={item.href === '/notifications' ? (unread.data ?? 0) : undefined}
           />
         ))}
