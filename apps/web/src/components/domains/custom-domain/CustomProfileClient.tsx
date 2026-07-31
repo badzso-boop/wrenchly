@@ -11,7 +11,7 @@ import { toValues, toPayload, formatDisplayValue, type FormValues } from '@/comp
 import type { ProfileFieldDef, ProfileFieldType } from '@/server/domains/profile/profile.fields'
 import type { CustomDomainField, FieldType } from '@prisma/client'
 
-const FIELD_TYPE_MAP: Record<FieldType, ProfileFieldType> = {
+export const FIELD_TYPE_MAP: Record<FieldType, ProfileFieldType> = {
   TEXT: 'text',
   NUMBER: 'number',
   DATE: 'date',
@@ -26,7 +26,7 @@ const FIELD_TYPE_MAP: Record<FieldType, ProfileFieldType> = {
   CHECKBOXES: 'select',
 }
 
-function toFieldDef(field: CustomDomainField): ProfileFieldDef {
+export function toFieldDef(field: CustomDomainField): ProfileFieldDef {
   return {
     key: field.key,
     label: field.name,
