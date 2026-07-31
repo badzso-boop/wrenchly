@@ -56,7 +56,7 @@ function DomainPicker({ itemId }: { itemId: string }) {
       <Card>
         <CardContent className="py-12 text-center space-y-2">
           <p className="text-muted-foreground">You don&apos;t have any custom domains yet.</p>
-          <p className="text-sm text-muted-foreground">Create one from Settings first, then come back here.</p>
+          <p className="text-sm text-muted-foreground">Create one from Custom Domains first, then come back here.</p>
         </CardContent>
       </Card>
     )

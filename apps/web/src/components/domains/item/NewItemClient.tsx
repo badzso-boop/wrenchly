@@ -2,6 +2,7 @@
 import { api } from '@/lib/trpc/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useState } from 'react'
+import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { getProfileFields } from '@/server/domains/profile/profile.fields'
 import { Button } from '@/components/ui/button'
@@ -10,6 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
 import type { ItemType } from '@prisma/client'
 
 const ITEM_TYPES: { value: ItemType; label: string }[] = [
@@ -66,20 +68,31 @@ export function NewItemClient() {
   const [brand, setBrand] = useState('')
   const [model, setModel] = useState('')
   const [description, setDescription] = useState('')
+  const [customDomainId, setCustomDomainId] = useState('')
 
   const hasProfileFields = getProfileFields(type) !== null
   const showGenericBrandModel = !hasProfileFields
+  const isCustom = type === 'CUSTOM'
+
+  const myDomains = api.customDomain.listMine.useQuery(undefined, { enabled: isCustom })
+  const attachDomain = api.customDomain.attachItem.useMutation({
+    onSuccess: (_, vars) => router.push(`/items/${vars.itemId}/profile`),
+  })
 
   const createItem = api.item.create.useMutation({
     onSuccess: (item) => {
-      if (type === 'VEHICLE') router.push(`/items/${item.id}/vehicle`)
-      else if (hasProfileFields || type === 'CUSTOM') router.push(`/items/${item.id}/profile`)
+      if (isCustom && customDomainId) attachDomain.mutate({ itemId: item.id, customDomainId })
+      else if (type === 'VEHICLE') router.push(`/items/${item.id}/vehicle`)
+      else if (hasProfileFields) router.push(`/items/${item.id}/profile`)
       else router.push(`/items/${item.id}`)
     },
   })
 
+  const submitDisabled = createItem.isPending || attachDomain.isPending || !name || (isCustom && !customDomainId)
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (submitDisabled) return
     createItem.mutate({
       name,
       type,
@@ -131,6 +144,31 @@ export function NewItemClient() {
                   </Select>
                 </div>
 
+                {isCustom && (
+                  <div className="space-y-2">
+                    <Label htmlFor="custom-domain">Custom domain *</Label>
+                    {myDomains.isLoading ? (
+                      <Skeleton className="h-10 rounded-md" />
+                    ) : myDomains.data && myDomains.data.length > 0 ? (
+                      <Select value={customDomainId} onValueChange={(v) => { if (v !== null) setCustomDomainId(v) }}>
+                        <SelectTrigger id="custom-domain">
+                          <SelectValue placeholder="Select a domain…" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {myDomains.data.map((d) => (
+                            <SelectItem key={d.id} value={d.id}>{d.icon ? `${d.icon} ` : ''}{d.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        You don&apos;t have any custom domains yet.{' '}
+                        <Link href="/custom-domains" className="underline">Create one</Link> first, then come back here.
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 {showGenericBrandModel && (
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
@@ -172,12 +210,14 @@ export function NewItemClient() {
                   />
                 </div>
 
-                {createItem.error && (
-                  <p className="text-sm text-destructive bg-destructive/10 rounded-md px-3 py-2">{createItem.error.message}</p>
+                {(createItem.error || attachDomain.error) && (
+                  <p className="text-sm text-destructive bg-destructive/10 rounded-md px-3 py-2">
+                    {createItem.error?.message ?? attachDomain.error?.message}
+                  </p>
                 )}
 
-                <Button type="submit" className="w-full" disabled={createItem.isPending || !name}>
-                  {createItem.isPending ? 'Creating…' : 'Create Item'}
+                <Button type="submit" className="w-full" disabled={submitDisabled}>
+                  {createItem.isPending || attachDomain.isPending ? 'Creating…' : 'Create Item'}
                 </Button>
               </form>
             </CardContent>
