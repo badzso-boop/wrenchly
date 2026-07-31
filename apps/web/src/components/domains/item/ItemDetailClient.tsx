@@ -2,8 +2,9 @@
 import { api } from '@/lib/trpc/client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { ArrowLeft, Pencil, Bell, Car, FileText, Route, BarChart3 } from 'lucide-react'
+import { ArrowLeft, Pencil, Bell, FileText, ListChecks } from 'lucide-react'
 import { getProfileFields } from '@/server/domains/profile/profile.fields'
+import { getExtraTabs } from './item-log-config'
 import { MaintenanceList } from '@/components/domains/maintenance/MaintenanceList'
 import { AddMaintenanceForm } from '@/components/domains/maintenance/AddMaintenanceForm'
 import { ShareButton } from '@/components/domains/share/ShareButton'
@@ -20,6 +21,14 @@ export function ItemDetailClient({ itemId }: { itemId: string }) {
   const item = api.item.getById.useQuery({ id: itemId })
   const records = api.maintenance.listByItemId.useQuery({ itemId, limit: 20 })
   const pathname = usePathname()
+  // CUSTOM-typed items only get a "Log" tab once their attached domain actually has an active
+  // loggable field -- gating on real data rather than just the item type, since a plain custom
+  // domain (Profile-tab-only, the pre-Phase-5 use case) shouldn't show an empty log page.
+  const customItemData = api.customDomain.getItemData.useQuery(
+    { itemId },
+    { enabled: item.data?.type === 'CUSTOM' }
+  )
+  const hasCustomLogFields = !!customItemData.data?.domain?.fields.some((f) => f.loggable && !f.archivedAt)
 
   if (item.isLoading) return (
     <div className="flex flex-col h-full">
@@ -40,15 +49,13 @@ export function ItemDetailClient({ itemId }: { itemId: string }) {
     </div>
   )
 
-  const isVehicle = item.data.type === 'VEHICLE'
   const hasGenericProfile = item.data.type === 'CUSTOM' || getProfileFields(item.data.type) !== null
 
-  const tabs = [
+  const tabs: { href: string; label: string; icon?: typeof Bell }[] = [
     { href: `/items/${itemId}`, label: 'Maintenance' },
     { href: `/items/${itemId}/reminders`, label: 'Reminders', icon: Bell },
-    ...(isVehicle ? [{ href: `/items/${itemId}/vehicle`, label: 'Vehicle', icon: Car }] : []),
-    ...(isVehicle ? [{ href: `/items/${itemId}/trips`, label: 'Trip Log', icon: Route }] : []),
-    ...(isVehicle ? [{ href: `/items/${itemId}/statistics`, label: 'Statistics', icon: BarChart3 }] : []),
+    ...getExtraTabs(item.data.type, itemId),
+    ...(hasCustomLogFields ? [{ href: `/items/${itemId}/custom-log`, label: 'Log', icon: ListChecks }] : []),
     ...(hasGenericProfile ? [{ href: `/items/${itemId}/profile`, label: 'Profile', icon: FileText }] : []),
   ]
 

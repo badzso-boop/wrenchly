@@ -11,16 +11,22 @@ import { toValues, toPayload, formatDisplayValue, type FormValues } from '@/comp
 import type { ProfileFieldDef, ProfileFieldType } from '@/server/domains/profile/profile.fields'
 import type { CustomDomainField, FieldType } from '@prisma/client'
 
-const FIELD_TYPE_MAP: Record<FieldType, ProfileFieldType> = {
+export const FIELD_TYPE_MAP: Record<FieldType, ProfileFieldType> = {
   TEXT: 'text',
   NUMBER: 'number',
   DATE: 'date',
   BOOLEAN: 'boolean',
   ENUM: 'select',
   URL: 'text',
+  // LONG_TEXT/DECIMAL/RADIO/CHECKBOXES are new Log-tab-oriented widget types; mapped to the
+  // closest existing Profile-tab rendering for now (Profile tab itself is unchanged this phase)
+  LONG_TEXT: 'text',
+  DECIMAL: 'decimal',
+  RADIO: 'select',
+  CHECKBOXES: 'select',
 }
 
-function toFieldDef(field: CustomDomainField): ProfileFieldDef {
+export function toFieldDef(field: CustomDomainField): ProfileFieldDef {
   return {
     key: field.key,
     label: field.name,
@@ -50,7 +56,7 @@ function DomainPicker({ itemId }: { itemId: string }) {
       <Card>
         <CardContent className="py-12 text-center space-y-2">
           <p className="text-muted-foreground">You don&apos;t have any custom domains yet.</p>
-          <p className="text-sm text-muted-foreground">Create one from Settings first, then come back here.</p>
+          <p className="text-sm text-muted-foreground">Create one from Custom Domains first, then come back here.</p>
         </CardContent>
       </Card>
     )

@@ -22,20 +22,28 @@ test.describe('Items (mock)', () => {
 
   test('new item form renders and validates', async ({ page }) => {
     await page.goto('/items/new')
-    await expect(page.getByLabel(/name/i)).toBeVisible()
-    const saveBtn = page.getByRole('button', { name: /save|create|add/i })
+    // Step 1 only asks for the type — Name lives on step 2 now.
+    await expect(page.getByLabel(/name/i)).toHaveCount(0)
+    await page.getByRole('button', { name: 'Next', exact: true }).click()
+
+    await expect(page.getByLabel(/^name/i)).toBeVisible()
+    const saveBtn = page.getByRole('button', { name: /create/i })
     await expect(saveBtn).toBeDisabled()
-    await page.getByLabel(/name/i).fill('My New Item')
+    await page.getByLabel(/^name/i).fill('My New Item')
     await expect(saveBtn).toBeEnabled()
   })
 
   test('new item form submits and redirects', async ({ page }) => {
     await page.goto('/items/new')
-    await page.getByLabel(/name/i).fill('New Test Item')
     const typeSelect = page.getByRole('combobox').first()
     await typeSelect.click()
     await page.getByRole('option', { name: /vehicle/i }).click()
-    await page.getByRole('button', { name: /save|create|add/i }).click()
+    await page.getByRole('button', { name: 'Next', exact: true }).click()
+
+    await page.getByLabel(/^name/i).fill('New Test Item')
+    await page.locator('#make').fill('Toyota')
+    await page.locator('#vmodel').fill('Corolla')
+    await page.getByRole('button', { name: /create/i }).click()
     await expect(page).toHaveURL(/\/items\//, { timeout: 5000 })
   })
 

@@ -6,12 +6,15 @@ import { ArrowLeft, BarChart3 } from 'lucide-react'
 import { AddTripLogForm } from './AddTripLogForm'
 import { TripLogList, TripLogListSkeleton } from './TripLogList'
 import { Button } from '@/components/ui/button'
+import { getTripLogLabels } from '@/server/domains/trip/trip.labels'
 
 export function TripLogPageClient({ itemId }: { itemId: string }) {
   const [showAddForm, setShowAddForm] = useState(false)
   const item = api.item.getById.useQuery({ id: itemId })
   const trips = api.trip.listByItemId.useQuery({ itemId, limit: 50 })
   const utils = api.useUtils()
+
+  const labels = item.data ? getTripLogLabels(item.data.type) : null
 
   return (
     <div className="flex flex-col h-full">
@@ -21,7 +24,7 @@ export function TripLogPageClient({ itemId }: { itemId: string }) {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-xl font-semibold">Trip Log</h1>
+            <h1 className="text-xl font-semibold">{labels?.tabLabel ?? 'Trip Log'}</h1>
             {item.data && <p className="text-sm text-muted-foreground">{item.data.name}</p>}
           </div>
         </div>
@@ -33,20 +36,21 @@ export function TripLogPageClient({ itemId }: { itemId: string }) {
       <div className="flex-1 overflow-auto px-6 py-6 animate-in fade-in-0 duration-300">
         <div className="max-w-2xl mx-auto space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-base font-semibold">Trips</h2>
+            <h2 className="text-base font-semibold">{labels?.tabLabel ?? 'Trips'}</h2>
             <Button
               size="sm"
               variant={showAddForm ? 'secondary' : 'default'}
               onClick={() => setShowAddForm(!showAddForm)}
             >
-              {showAddForm ? 'Cancel' : '+ Log Trip'}
+              {showAddForm ? 'Cancel' : `+ ${labels?.formTitle ?? 'Log Trip'}`}
             </Button>
           </div>
 
-          {showAddForm && (
+          {showAddForm && item.data && (
             <div className="animate-in slide-in-from-top-2 duration-200">
               <AddTripLogForm
                 itemId={itemId}
+                itemType={item.data.type}
                 onSuccess={() => {
                   setShowAddForm(false)
                   void trips.refetch()
@@ -58,7 +62,7 @@ export function TripLogPageClient({ itemId }: { itemId: string }) {
           )}
 
           {trips.isLoading && <TripLogListSkeleton />}
-          {trips.data && <TripLogList trips={trips.data} />}
+          {trips.data && item.data && <TripLogList trips={trips.data} itemType={item.data.type} />}
         </div>
       </div>
     </div>

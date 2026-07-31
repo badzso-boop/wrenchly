@@ -12,7 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { FUEL_TYPES } from '@/components/domains/vehicle/VehicleProfileClient'
-import type { TripLog, TripFuelStop, TripExpense } from '@prisma/client'
+import { getTripLogLabels } from '@/server/domains/trip/trip.labels'
+import type { TripLog, TripFuelStop, TripExpense, ItemType } from '@prisma/client'
 
 type TripWithChildren = TripLog & { fuelStops: TripFuelStop[]; expenses: TripExpense[] }
 
@@ -41,18 +42,24 @@ interface ExpenseForm {
   description: string
 }
 
-function consumptionLabel(trip: TripWithChildren): string | null {
+function consumptionLabel(trip: TripWithChildren, itemType: ItemType): string | null {
   const fuelQty = Number(trip.totalFuelQty)
   if (fuelQty <= 0 || trip.distanceKm <= 0) return null
-  const per100 = fuelQty / (trip.distanceKm / 100)
-  return `${per100.toFixed(1)} L/100km`
+  const divisor = itemType === 'BOAT' ? trip.distanceKm : trip.distanceKm / 100
+  const unit = itemType === 'BOAT' ? 'L/hour' : 'L/100km'
+  return `${(fuelQty / divisor).toFixed(1)} ${unit}`
 }
 
-function EditTripLogForm({ trip, onDone }: { trip: TripWithChildren; onDone: () => void }) {
+function EditTripLogForm({ trip, itemType, onDone }: { trip: TripWithChildren; itemType: ItemType; onDone: () => void }) {
+  const labels = getTripLogLabels(itemType)
   const utils = api.useUtils()
   const [startedAt, setStartedAt] = useState(new Date(trip.startedAt).toISOString().slice(0, 10))
   const [startOdometer, setStartOdometer] = useState(String(trip.startOdometer))
   const [distanceKm, setDistanceKm] = useState(String(trip.distanceKm))
+  const [durationMin, setDurationMin] = useState(trip.durationMin?.toString() ?? '')
+  const [elevationGainM, setElevationGainM] = useState(trip.elevationGainM?.toString() ?? '')
+  const [batteryPercentUsed, setBatteryPercentUsed] = useState(trip.batteryPercentUsed?.toString() ?? '')
+  const [maxAltitudeM, setMaxAltitudeM] = useState(trip.maxAltitudeM?.toString() ?? '')
   const [description, setDescription] = useState(trip.description ?? '')
   const [notes, setNotes] = useState(trip.notes ?? '')
   const [startFuelLiters, setStartFuelLiters] = useState(trip.startFuelLiters?.toString() ?? '')
@@ -104,6 +111,8 @@ function EditTripLogForm({ trip, onDone }: { trip: TripWithChildren; onDone: () 
     setExpenses(expenses.filter((_, i) => i !== index))
   }
 
+  if (!labels) return null
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     updateTrip.mutate({
@@ -111,8 +120,12 @@ function EditTripLogForm({ trip, onDone }: { trip: TripWithChildren; onDone: () 
       startedAt: new Date(startedAt),
       description: description || undefined,
       notes: notes || undefined,
-      startOdometer: Number(startOdometer),
-      distanceKm: Number(distanceKm),
+      startOdometer: labels!.showOdometerFields ? Number(startOdometer) : undefined,
+      distanceKm: distanceKm ? Number(distanceKm) : undefined,
+      durationMin: durationMin ? Number(durationMin) : undefined,
+      elevationGainM: elevationGainM ? Number(elevationGainM) : undefined,
+      batteryPercentUsed: batteryPercentUsed ? Number(batteryPercentUsed) : undefined,
+      maxAltitudeM: maxAltitudeM ? Number(maxAltitudeM) : undefined,
       startFuelLiters: startFuelLiters ? Number(startFuelLiters) : undefined,
       fuelStops: fuelStops
         .filter((f) => f.quantity && f.pricePerUnit)
@@ -149,99 +162,129 @@ function EditTripLogForm({ trip, onDone }: { trip: TripWithChildren; onDone: () 
       </div>
 
       <div className="grid grid-cols-2 gap-3">
+        {labels.showOdometerFields && (
+          <div className="space-y-1.5">
+            <Label htmlFor={`edit-trip-start-odo-${trip.id}`}>{labels.startFieldLabel} *</Label>
+            <Input id={`edit-trip-start-odo-${trip.id}`} type="number" value={startOdometer} onChange={(e) => setStartOdometer((e.target as HTMLInputElement).value)} min="0" required />
+          </div>
+        )}
         <div className="space-y-1.5">
-          <Label htmlFor={`edit-trip-start-odo-${trip.id}`}>Starting odometer (km) *</Label>
-          <Input id={`edit-trip-start-odo-${trip.id}`} type="number" value={startOdometer} onChange={(e) => setStartOdometer((e.target as HTMLInputElement).value)} min="0" required />
+          <Label htmlFor={`edit-trip-distance-${trip.id}`}>{labels.distanceFieldLabel}{labels.distanceRequired ? ' *' : ''}</Label>
+          <Input id={`edit-trip-distance-${trip.id}`} type="number" value={distanceKm} onChange={(e) => setDistanceKm((e.target as HTMLInputElement).value)} min="0" required={labels.distanceRequired} />
         </div>
-        <div className="space-y-1.5">
-          <Label htmlFor={`edit-trip-distance-${trip.id}`}>Distance (km) *</Label>
-          <Input id={`edit-trip-distance-${trip.id}`} type="number" value={distanceKm} onChange={(e) => setDistanceKm((e.target as HTMLInputElement).value)} min="1" required />
-        </div>
+        {labels.showDuration && (
+          <div className="space-y-1.5">
+            <Label htmlFor={`edit-trip-duration-${trip.id}`}>Duration (min)</Label>
+            <Input id={`edit-trip-duration-${trip.id}`} type="number" value={durationMin} onChange={(e) => setDurationMin((e.target as HTMLInputElement).value)} min="0" />
+          </div>
+        )}
+        {labels.showElevation && (
+          <div className="space-y-1.5">
+            <Label htmlFor={`edit-trip-elevation-${trip.id}`}>Elevation gain (m)</Label>
+            <Input id={`edit-trip-elevation-${trip.id}`} type="number" value={elevationGainM} onChange={(e) => setElevationGainM((e.target as HTMLInputElement).value)} min="0" />
+          </div>
+        )}
+        {labels.showBattery && (
+          <>
+            <div className="space-y-1.5">
+              <Label htmlFor={`edit-trip-battery-${trip.id}`}>Battery used (%)</Label>
+              <Input id={`edit-trip-battery-${trip.id}`} type="number" value={batteryPercentUsed} onChange={(e) => setBatteryPercentUsed((e.target as HTMLInputElement).value)} min="0" max="100" />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor={`edit-trip-altitude-${trip.id}`}>Max altitude (m)</Label>
+              <Input id={`edit-trip-altitude-${trip.id}`} type="number" value={maxAltitudeM} onChange={(e) => setMaxAltitudeM((e.target as HTMLInputElement).value)} min="0" />
+            </div>
+          </>
+        )}
       </div>
 
-      <div className="space-y-1.5">
-        <Label htmlFor={`edit-trip-start-fuel-${trip.id}`}>Approx. fuel at start (liters)</Label>
-        <Input id={`edit-trip-start-fuel-${trip.id}`} type="number" value={startFuelLiters} onChange={(e) => setStartFuelLiters((e.target as HTMLInputElement).value)} min="0" />
-      </div>
+      {labels.showFuelSection && (
+        <>
+          <div className="space-y-1.5">
+            <Label htmlFor={`edit-trip-start-fuel-${trip.id}`}>Approx. fuel at start (liters)</Label>
+            <Input id={`edit-trip-start-fuel-${trip.id}`} type="number" value={startFuelLiters} onChange={(e) => setStartFuelLiters((e.target as HTMLInputElement).value)} min="0" />
+          </div>
 
-      <div>
-        <div className="flex items-center justify-between mb-2">
-          <Label>Fuel Stops</Label>
-          <Button type="button" variant="ghost" size="sm" onClick={addFuelStop} className="h-7 text-xs">
-            <Plus className="h-3 w-3 mr-1" /> Add Fuel Stop
-          </Button>
-        </div>
-        {fuelStops.map((stop, i) => {
-          const total = (Number(stop.quantity) || 0) * (Number(stop.pricePerUnit) || 0)
-          return (
-            <div key={i} className="rounded-lg border p-3 mb-2 space-y-2">
-              <div className="grid grid-cols-4 gap-2">
-                <Input type="number" value={stop.quantity} onChange={(e) => updateFuelStop(i, 'quantity', (e.target as HTMLInputElement).value)} placeholder="Qty" min="0" step="0.01" className="h-8 text-sm" />
-                <Select value={stop.unit} onValueChange={(v) => { if (v !== null) updateFuelStop(i, 'unit', v) }}>
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <Label>Fuel Stops</Label>
+              <Button type="button" variant="ghost" size="sm" onClick={addFuelStop} className="h-7 text-xs">
+                <Plus className="h-3 w-3 mr-1" /> Add Fuel Stop
+              </Button>
+            </div>
+            {fuelStops.map((stop, i) => {
+              const total = (Number(stop.quantity) || 0) * (Number(stop.pricePerUnit) || 0)
+              return (
+                <div key={i} className="rounded-lg border p-3 mb-2 space-y-2">
+                  <div className="grid grid-cols-4 gap-2">
+                    <Input type="number" value={stop.quantity} onChange={(e) => updateFuelStop(i, 'quantity', (e.target as HTMLInputElement).value)} placeholder="Qty" min="0" step="0.01" className="h-8 text-sm" />
+                    <Select value={stop.unit} onValueChange={(v) => { if (v !== null) updateFuelStop(i, 'unit', v) }}>
+                      <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="liter">liter</SelectItem>
+                        <SelectItem value="kWh">kWh</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Input type="number" value={stop.pricePerUnit} onChange={(e) => updateFuelStop(i, 'pricePerUnit', (e.target as HTMLInputElement).value)} placeholder="Price/unit" min="0" className="h-8 text-sm" />
+                    <Select value={stop.currency} onValueChange={(v) => { if (v !== null) updateFuelStop(i, 'currency', v) }}>
+                      <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {CURRENCIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid grid-cols-4 gap-2 items-center">
+                    <Select value={stop.fuelType || 'none'} onValueChange={(v) => { if (v !== null) updateFuelStop(i, 'fuelType', v === 'none' ? '' : v) }}>
+                      <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Fuel type" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Fuel type</SelectItem>
+                        {FUEL_TYPES.map((ft) => <SelectItem key={ft} value={ft}>{ft}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <Input value={stop.station} onChange={(e) => updateFuelStop(i, 'station', (e.target as HTMLInputElement).value)} placeholder="Station (optional)" className="h-8 text-sm col-span-2" />
+                    <div className="flex items-center justify-end gap-1">
+                      <span className="text-xs text-muted-foreground tabular-nums">{total.toLocaleString()} {stop.currency}</span>
+                      <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => removeFuelStop(i)}>
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <Label>Tolls, Vignettes &amp; Parking</Label>
+              <Button type="button" variant="ghost" size="sm" onClick={addExpense} className="h-7 text-xs">
+                <Plus className="h-3 w-3 mr-1" /> Add Expense
+              </Button>
+            </div>
+            {expenses.map((ex, i) => (
+              <div key={i} className="grid grid-cols-5 gap-2 mb-2 items-center">
+                <Select value={ex.type} onValueChange={(v) => { if (v !== null) updateExpense(i, 'type', v) }}>
                   <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="liter">liter</SelectItem>
-                    <SelectItem value="kWh">kWh</SelectItem>
+                    {EXPENSE_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
                   </SelectContent>
                 </Select>
-                <Input type="number" value={stop.pricePerUnit} onChange={(e) => updateFuelStop(i, 'pricePerUnit', (e.target as HTMLInputElement).value)} placeholder="Price/unit" min="0" className="h-8 text-sm" />
-                <Select value={stop.currency} onValueChange={(v) => { if (v !== null) updateFuelStop(i, 'currency', v) }}>
+                <Input type="number" value={ex.amount} onChange={(e) => updateExpense(i, 'amount', (e.target as HTMLInputElement).value)} placeholder="Amount" min="0" className="h-8 text-sm" />
+                <Select value={ex.currency} onValueChange={(v) => { if (v !== null) updateExpense(i, 'currency', v) }}>
                   <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {CURRENCIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                   </SelectContent>
                 </Select>
+                <Input value={ex.description} onChange={(e) => updateExpense(i, 'description', (e.target as HTMLInputElement).value)} placeholder="Note" className="h-8 text-sm" />
+                <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive justify-self-end" onClick={() => removeExpense(i)}>
+                  <X className="h-3.5 w-3.5" />
+                </Button>
               </div>
-              <div className="grid grid-cols-4 gap-2 items-center">
-                <Select value={stop.fuelType || 'none'} onValueChange={(v) => { if (v !== null) updateFuelStop(i, 'fuelType', v === 'none' ? '' : v) }}>
-                  <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Fuel type" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Fuel type</SelectItem>
-                    {FUEL_TYPES.map((ft) => <SelectItem key={ft} value={ft}>{ft}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <Input value={stop.station} onChange={(e) => updateFuelStop(i, 'station', (e.target as HTMLInputElement).value)} placeholder="Station (optional)" className="h-8 text-sm col-span-2" />
-                <div className="flex items-center justify-end gap-1">
-                  <span className="text-xs text-muted-foreground tabular-nums">{total.toLocaleString()} {stop.currency}</span>
-                  <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => removeFuelStop(i)}>
-                    <X className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )
-        })}
-      </div>
-
-      <div>
-        <div className="flex items-center justify-between mb-2">
-          <Label>Tolls, Vignettes &amp; Parking</Label>
-          <Button type="button" variant="ghost" size="sm" onClick={addExpense} className="h-7 text-xs">
-            <Plus className="h-3 w-3 mr-1" /> Add Expense
-          </Button>
-        </div>
-        {expenses.map((ex, i) => (
-          <div key={i} className="grid grid-cols-5 gap-2 mb-2 items-center">
-            <Select value={ex.type} onValueChange={(v) => { if (v !== null) updateExpense(i, 'type', v) }}>
-              <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {EXPENSE_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            <Input type="number" value={ex.amount} onChange={(e) => updateExpense(i, 'amount', (e.target as HTMLInputElement).value)} placeholder="Amount" min="0" className="h-8 text-sm" />
-            <Select value={ex.currency} onValueChange={(v) => { if (v !== null) updateExpense(i, 'currency', v) }}>
-              <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {CURRENCIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            <Input value={ex.description} onChange={(e) => updateExpense(i, 'description', (e.target as HTMLInputElement).value)} placeholder="Note" className="h-8 text-sm" />
-            <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive justify-self-end" onClick={() => removeExpense(i)}>
-              <X className="h-3.5 w-3.5" />
-            </Button>
+            ))}
           </div>
-        ))}
-      </div>
+        </>
+      )}
 
       <div className="space-y-1.5">
         <Label htmlFor={`edit-trip-notes-${trip.id}`}>What happened on the way</Label>
@@ -260,10 +303,11 @@ function EditTripLogForm({ trip, onDone }: { trip: TripWithChildren; onDone: () 
   )
 }
 
-export function TripLogList({ trips }: { trips: TripWithChildren[] }) {
+export function TripLogList({ trips, itemType }: { trips: TripWithChildren[]; itemType: ItemType }) {
   const utils = api.useUtils()
   const [expanded, setExpanded] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const labels = getTripLogLabels(itemType)
   const deleteTrip = api.trip.delete.useMutation({
     onSuccess: () => {
       utils.trip.listByItemId.invalidate()
@@ -271,11 +315,13 @@ export function TripLogList({ trips }: { trips: TripWithChildren[] }) {
     },
   })
 
+  if (!labels) return null
+
   if (trips.length === 0) {
     return (
       <Card>
         <CardContent className="py-12 text-center">
-          <p className="text-muted-foreground text-sm">No trips logged yet.</p>
+          <p className="text-muted-foreground text-sm">No entries logged yet.</p>
         </CardContent>
       </Card>
     )
@@ -285,8 +331,9 @@ export function TripLogList({ trips }: { trips: TripWithChildren[] }) {
     <div className="space-y-2">
       {trips.map((trip) => {
         const isExpanded = expanded === trip.id
-        const consumption = consumptionLabel(trip)
+        const consumption = consumptionLabel(trip, itemType)
         const totalCost = Number(trip.totalFuelCost) + Number(trip.totalExpenseCost)
+        const distanceUnit = labels.distanceFieldLabel.toLowerCase().includes('hour') ? 'h' : 'km'
 
         return (
           <Card key={trip.id} className="transition-all duration-200 hover:shadow-sm">
@@ -306,7 +353,9 @@ export function TripLogList({ trips }: { trips: TripWithChildren[] }) {
                   </div>
                   <div className="flex items-center gap-3 text-xs text-muted-foreground">
                     <span>{new Date(trip.startedAt).toLocaleDateString()}</span>
-                    <span>{trip.distanceKm.toLocaleString()} km</span>
+                    {trip.distanceKm > 0 && <span>{trip.distanceKm.toLocaleString()} {distanceUnit}</span>}
+                    {trip.durationMin != null && <span>{trip.durationMin} min</span>}
+                    {trip.batteryPercentUsed != null && <span>{trip.batteryPercentUsed}% battery</span>}
                     {totalCost > 0 && (
                       <span className="font-medium text-foreground">{totalCost.toLocaleString()}</span>
                     )}
@@ -317,21 +366,35 @@ export function TripLogList({ trips }: { trips: TripWithChildren[] }) {
 
               {isExpanded && editingId === trip.id && (
                 <div className="px-4 pb-4 animate-in slide-in-from-top-1 duration-150 border-t">
-                  <EditTripLogForm trip={trip} onDone={() => setEditingId(null)} />
+                  <EditTripLogForm trip={trip} itemType={itemType} onDone={() => setEditingId(null)} />
                 </div>
               )}
 
               {isExpanded && editingId !== trip.id && (
                 <div className="px-4 pb-4 animate-in slide-in-from-top-1 duration-150 border-t">
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 text-sm">
-                    <div>
-                      <p className="text-muted-foreground text-xs mb-0.5">Odometer</p>
-                      <p className="font-medium">{trip.startOdometer.toLocaleString()} → {trip.endOdometer.toLocaleString()} km</p>
-                    </div>
+                    {labels.showOdometerFields && (
+                      <div>
+                        <p className="text-muted-foreground text-xs mb-0.5">{labels.startFieldLabel}</p>
+                        <p className="font-medium">{trip.startOdometer.toLocaleString()} → {trip.endOdometer.toLocaleString()}</p>
+                      </div>
+                    )}
                     {trip.startFuelLiters != null && (
                       <div>
                         <p className="text-muted-foreground text-xs mb-0.5">Fuel at start</p>
                         <p className="font-medium">{Number(trip.startFuelLiters)} L</p>
+                      </div>
+                    )}
+                    {trip.elevationGainM != null && (
+                      <div>
+                        <p className="text-muted-foreground text-xs mb-0.5">Elevation gain</p>
+                        <p className="font-medium">{trip.elevationGainM} m</p>
+                      </div>
+                    )}
+                    {trip.maxAltitudeM != null && (
+                      <div>
+                        <p className="text-muted-foreground text-xs mb-0.5">Max altitude</p>
+                        <p className="font-medium">{trip.maxAltitudeM} m</p>
                       </div>
                     )}
                   </div>
@@ -370,7 +433,7 @@ export function TripLogList({ trips }: { trips: TripWithChildren[] }) {
                       variant="ghost"
                       size="sm"
                       className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                      onClick={() => { if (window.confirm('Delete this trip?')) deleteTrip.mutate({ id: trip.id }) }}
+                      onClick={() => { if (window.confirm('Delete this entry?')) deleteTrip.mutate({ id: trip.id }) }}
                     >
                       <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
                     </Button>
