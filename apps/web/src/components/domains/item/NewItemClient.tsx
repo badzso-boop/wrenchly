@@ -82,6 +82,7 @@ export function NewItemClient() {
   const isCustom = type === 'CUSTOM'
   const profileFields = getProfileFields(type) ?? []
   const hasProfileFields = profileFields.length > 0
+  const visibleProfileFields = profileFields.filter((f) => !f.mirrorsItemName)
   const isGenericSimple = !isVehicle && !isCustom && !hasProfileFields
 
   const myDomains = api.customDomain.listMine.useQuery(undefined, { enabled: isCustom })
@@ -137,8 +138,12 @@ export function NewItemClient() {
               { onSuccess: () => router.push(`/items/${item.id}`) }
             )
           } else if (hasProfileFields) {
+            const data = toPayload(profileFields, profileValues)
+            for (const field of profileFields) {
+              if (field.mirrorsItemName) data[field.key] = name
+            }
             profileUpsert.mutate(
-              { itemId: item.id, data: toPayload(profileFields, profileValues) },
+              { itemId: item.id, data },
               { onSuccess: () => router.push(`/items/${item.id}`) }
             )
           } else if (isCustom) {
@@ -255,7 +260,7 @@ export function NewItemClient() {
 
                   {isVehicle && <VehicleProfileFields form={vehicleForm} setForm={setVehicleForm} />}
 
-                  {hasProfileFields && profileFields.map((field) => (
+                  {hasProfileFields && visibleProfileFields.map((field) => (
                     <ProfileFieldInput
                       key={field.key}
                       field={field}
