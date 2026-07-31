@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { DateField } from '@/components/ui/date-field'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { LogFieldInput, formatLogFieldValue, extractRawValue, type LogFieldValues } from './LogFieldInput'
+import { LogFieldInput, formatLogFieldValue, extractRawValue, resolveFieldWithConfig, type LogFieldValues } from './LogFieldInput'
 import type { FieldWithConfig, EntryWithValues } from '@/server/domains/custom-domain/custom-domain.repository'
 
 function entryToValues(entry: EntryWithValues): LogFieldValues {
@@ -56,8 +56,9 @@ function EditEntryForm({
       <div className="grid grid-cols-2 gap-3">
         {activeFields.map((field) => (
           <div key={field.id} className={`space-y-1.5 ${field.widthCols === 2 ? 'col-span-2' : 'col-span-1'}`}>
-            <Label>{field.name}{field.unit ? ` (${field.unit})` : ''}</Label>
+            <Label>{field.name}{field.unit ? ` (${field.unit})` : ''}{field.required ? ' *' : ''}</Label>
             <LogFieldInput field={field} values={values} onChange={(key, v) => setValues((prev) => ({ ...prev, [key]: v }))} />
+            {field.fieldConfig?.helpText && <p className="text-xs text-muted-foreground">{field.fieldConfig.helpText}</p>}
           </div>
         ))}
       </div>
@@ -111,7 +112,7 @@ export function CustomLogEntryList({ fields, entries }: { fields: FieldWithConfi
                     <span className="font-medium text-sm">{new Date(entry.recordedAt).toLocaleDateString()}</span>
                     {preview.map((v) => (
                       <span key={v.id} className="text-xs px-2 py-0.5 rounded-full font-medium bg-primary/10 text-primary shrink-0">
-                        {v.field.name}: {formatLogFieldValue(fieldsById[v.fieldId] ?? { ...v.field, fieldConfig: null }, extractRawValue(v))}
+                        {v.field.name}: {formatLogFieldValue(resolveFieldWithConfig(fieldsById, v.fieldId, v.field), extractRawValue(v))}
                       </span>
                     ))}
                   </div>
@@ -136,7 +137,7 @@ export function CustomLogEntryList({ fields, entries }: { fields: FieldWithConfi
                           <p className="text-muted-foreground text-xs mb-0.5">
                             {v.field.name}{isArchived ? ' (removed field)' : ''}
                           </p>
-                          <p className="font-medium">{formatLogFieldValue(fieldsById[v.fieldId] ?? { ...v.field, fieldConfig: null }, extractRawValue(v))}</p>
+                          <p className="font-medium">{formatLogFieldValue(resolveFieldWithConfig(fieldsById, v.fieldId, v.field), extractRawValue(v))}</p>
                         </div>
                       )
                     })}

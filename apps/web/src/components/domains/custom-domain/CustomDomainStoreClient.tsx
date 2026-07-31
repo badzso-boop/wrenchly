@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { FieldLayoutPreview } from './CustomLogBuilder'
-import { formatLogFieldValue, extractRawValue } from './LogFieldInput'
+import { formatLogFieldValue, extractRawValue, resolveFieldWithConfig } from './LogFieldInput'
 import type { CustomDomainStoreListing } from '@/server/domains/custom-domain/custom-domain.repository'
 
 function StoreEntryCard({ domain, onImported }: { domain: CustomDomainStoreListing; onImported: () => void }) {
@@ -39,7 +39,7 @@ function StoreEntryCard({ domain, onImported }: { domain: CustomDomainStoreListi
             <p className="text-xs font-medium text-muted-foreground mb-1.5">Sample entry</p>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm rounded-lg border p-3">
               {sample.values.map((v) => {
-                const field = fieldsById[v.fieldId] ?? { ...v.field, fieldConfig: null }
+                const field = resolveFieldWithConfig(fieldsById, v.fieldId, v.field)
                 return (
                   <div key={v.id}>
                     <p className="text-muted-foreground text-xs mb-0.5">{v.field.name}</p>

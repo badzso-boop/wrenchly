@@ -10,6 +10,17 @@ import type { CustomDomainFieldValue } from '@prisma/client'
 
 export type LogFieldValues = Record<string, unknown>
 
+/** A value's embedded `field` snapshot lacks `fieldConfig` (not selected on that relation) --
+ * prefer the live field from `fieldsById` when present (has real config for formatting), else
+ * fall back to the embedded snapshot with `fieldConfig: null` (still enough to render a label). */
+export function resolveFieldWithConfig(
+  fieldsById: Record<string, FieldWithConfig>,
+  fieldId: string,
+  fallback: Omit<FieldWithConfig, 'fieldConfig'>
+): FieldWithConfig {
+  return fieldsById[fieldId] ?? { ...fallback, fieldConfig: null }
+}
+
 /** Converts a persisted `CustomDomainFieldValue` row (one nullable typed column set) back into
  * the plain JS value `LogFieldInput`/`formatLogFieldValue` expect. */
 export function extractRawValue(value: CustomDomainFieldValue): unknown {
