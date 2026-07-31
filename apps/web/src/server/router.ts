@@ -8,6 +8,7 @@ import { userRouter } from '@/server/domains/user/user.handler'
 import { inventoryRouter } from '@/server/domains/inventory/inventory.handler'
 import { profileRouter } from '@/server/domains/profile/profile.handler'
 import { customDomainRouter } from '@/server/domains/custom-domain/custom-domain.handler'
+import { customDomainLogRouter } from '@/server/domains/custom-domain/custom-domain-log.handler'
 import { onboardingRouter } from '@/server/domains/onboarding/onboarding.handler'
 import { shareRouter } from '@/server/domains/share/share.handler'
 import { tripRouter } from '@/server/domains/trip/trip.handler'
@@ -24,6 +25,7 @@ export const appRouter = createTRPCRouter({
   inventory: inventoryRouter,
   profile: profileRouter,
   customDomain: customDomainRouter,
+  customDomainLog: customDomainLogRouter,
   onboarding: onboardingRouter,
   share: shareRouter,
   trip: tripRouter,
