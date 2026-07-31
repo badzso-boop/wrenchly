@@ -167,6 +167,12 @@ const MAINTENANCE_CATEGORIES: Record<ItemType, MaintenanceCategoryDef[]> = {
     { value: 'REPLACEMENT', label: 'Replacement' },
     { value: 'OTHER', label: 'Other' },
   ],
+  HOME: [
+    { value: 'REPAIR', label: 'Repair' },
+    { value: 'RENOVATION', label: 'Renovation' },
+    { value: 'INSPECTION', label: 'Inspection' },
+    { value: 'OTHER', label: 'Other' },
+  ],
 }
 
 export function getMaintenanceCategories(itemType: ItemType): MaintenanceCategoryDef[] {

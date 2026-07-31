@@ -70,13 +70,13 @@ export function BarChart({
   // preserveAspectRatio, so it letterboxes (centers with side-margins) whenever the container's
   // aspect ratio doesn't match the viewBox's, which made a viewBox-based estimate drift off the
   // real bar position.
-  function pointerPosition(e: React.MouseEvent): { x: number; y: number } | null {
+  function pointerPosition(e: { clientX: number; clientY: number }): { x: number; y: number } | null {
     const rect = containerRef.current?.getBoundingClientRect()
     if (!rect) return null
     return { x: Math.min(rect.width - 8, Math.max(8, e.clientX - rect.left)), y: e.clientY - rect.top }
   }
 
-  function trackPointer(i: number, e: React.MouseEvent) {
+  function trackPointer(i: number, e: { clientX: number; clientY: number }) {
     const pos = pointerPosition(e)
     if (pos) setActive({ index: i, ...pos })
   }
@@ -126,6 +126,7 @@ export function BarChart({
                 onMouseMove={(e) => trackPointer(i, e)}
                 onMouseLeave={() => setActive((prev) => (prev?.index === i ? null : prev))}
                 onClick={(e) => trackPointer(i, e)}
+                onPointerUp={(e) => { if (e.pointerType === 'touch') trackPointer(i, e) }}
               >
                 {/* Invisible full-column hit target — bigger than the bar itself, easy to tap on mobile. */}
                 <rect x={PAD_LEFT + i * slotW} y={PAD_TOP} width={slotW} height={plotH} fill="transparent" pointerEvents="all" />
@@ -145,6 +146,7 @@ export function BarChart({
                       rx={2}
                       className={s.colorClass}
                       opacity={isActive ? 1 : 0.88}
+                      pointerEvents="none"
                     />
                   )
                 })}

@@ -84,13 +84,13 @@ export function LineChart({
   // preserveAspectRatio, so it letterboxes (centers with side-margins) whenever the container's
   // aspect ratio doesn't match the viewBox's, which drifts a viewBox-based estimate off the real
   // point position.
-  function pointerPosition(e: React.MouseEvent): { x: number; y: number } | null {
+  function pointerPosition(e: { clientX: number; clientY: number }): { x: number; y: number } | null {
     const rect = containerRef.current?.getBoundingClientRect()
     if (!rect) return null
     return { x: Math.min(rect.width - 8, Math.max(8, e.clientX - rect.left)), y: e.clientY - rect.top }
   }
 
-  function trackPointer(i: number, e: React.MouseEvent) {
+  function trackPointer(i: number, e: { clientX: number; clientY: number }) {
     const pos = pointerPosition(e)
     if (pos) setActive({ index: i, ...pos })
   }
@@ -150,6 +150,7 @@ export function LineChart({
               onMouseMove={(e) => trackPointer(i, e)}
               onMouseLeave={() => setActive((prev) => (prev?.index === i ? null : prev))}
               onClick={(e) => trackPointer(i, e)}
+              onPointerUp={(e) => { if (e.pointerType === 'touch') trackPointer(i, e) }}
             >
               {/* Invisible, generously-sized hit target — much bigger than the visible dot, easy to tap. */}
               <circle cx={c.x} cy={c.y} r={14} fill="transparent" pointerEvents="all" />
@@ -160,6 +161,7 @@ export function LineChart({
                 className={pointColorClass ? pointColorClass(c.point.value) : 'fill-chart-1'}
                 stroke="var(--background)"
                 strokeWidth={2}
+                pointerEvents="none"
               />
               {i % labelStride === 0 && (
                 <text x={c.x} y={H - 6} textAnchor="middle" className="fill-muted-foreground" fontSize={7}>
