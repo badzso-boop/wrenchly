@@ -11,7 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
-import type { FieldType } from '@prisma/client'
+import { CustomLogBuilder } from './CustomLogBuilder'
+import type { CustomDomainField, FieldType } from '@prisma/client'
 
 const FIELD_TYPES: { value: FieldType; label: string }[] = [
   { value: 'TEXT', label: 'Text' },
@@ -102,7 +103,7 @@ function AddFieldForm({ customDomainId, onAdded }: { customDomainId: string; onA
   )
 }
 
-function DomainRow({ domain, onChanged }: { domain: { id: string; name: string; icon: string | null; fields: { id: string; name: string; fieldType: FieldType; unit: string | null; required: boolean }[] }; onChanged: () => void }) {
+function DomainRow({ domain, onChanged }: { domain: { id: string; name: string; icon: string | null; fields: CustomDomainField[] }; onChanged: () => void }) {
   const [expanded, setExpanded] = useState(false)
   const [showAddField, setShowAddField] = useState(false)
 
@@ -137,29 +138,35 @@ function DomainRow({ domain, onChanged }: { domain: { id: string; name: string; 
       </div>
 
       {expanded && (
-        <div className="px-3 pb-3 space-y-2">
+        <div className="px-3 pb-3 space-y-4">
           <Separator />
-          {domain.fields.map((field) => (
-            <div key={field.id} className="flex items-center justify-between text-sm py-1">
-              <span>{field.name}{field.unit ? ` (${field.unit})` : ''}{field.required ? ' *' : ''}</span>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6"
-                onClick={() => removeField.mutate({ fieldId: field.id })}
-              >
-                <Trash2 className="h-3 w-3 text-muted-foreground" />
-              </Button>
-            </div>
-          ))}
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Profile fields</p>
+            {domain.fields.filter((f) => !f.loggable).map((field) => (
+              <div key={field.id} className="flex items-center justify-between text-sm py-1">
+                <span>{field.name}{field.unit ? ` (${field.unit})` : ''}{field.required ? ' *' : ''}</span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  onClick={() => removeField.mutate({ fieldId: field.id })}
+                >
+                  <Trash2 className="h-3 w-3 text-muted-foreground" />
+                </Button>
+              </div>
+            ))}
 
-          {showAddField ? (
-            <AddFieldForm customDomainId={domain.id} onAdded={() => { setShowAddField(false); onChanged() }} />
-          ) : (
-            <Button variant="outline" size="sm" onClick={() => setShowAddField(true)}>
-              <Plus className="h-3.5 w-3.5 mr-1" /> Add field
-            </Button>
-          )}
+            {showAddField ? (
+              <AddFieldForm customDomainId={domain.id} onAdded={() => { setShowAddField(false); onChanged() }} />
+            ) : (
+              <Button variant="outline" size="sm" onClick={() => setShowAddField(true)}>
+                <Plus className="h-3.5 w-3.5 mr-1" /> Add field
+              </Button>
+            )}
+          </div>
+
+          <Separator />
+          <CustomLogBuilder domain={domain} onChanged={onChanged} />
         </div>
       )}
     </div>
