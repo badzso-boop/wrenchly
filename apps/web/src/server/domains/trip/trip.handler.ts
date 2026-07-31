@@ -58,9 +58,16 @@ export const tripRouter = createTRPCRouter({
         startedAt: z.coerce.date(),
         description: z.string().max(500).optional(),
         notes: z.string().max(2000).optional(),
-        startOdometer: z.number().int().nonnegative(),
-        distanceKm: z.number().int().positive(),
+        // Optional: BICYCLE/DRONE have no per-trip "starting reading" concept (see
+        // trip.labels.ts's showOdometerFields) and DRONE's distance itself is optional — the
+        // service fills sane defaults (start=0, end=distanceKm) when omitted.
+        startOdometer: z.number().int().nonnegative().optional(),
+        distanceKm: z.number().int().nonnegative().optional(),
         startFuelLiters: z.number().nonnegative().optional(),
+        durationMin: z.number().int().positive().optional(),
+        elevationGainM: z.number().int().nonnegative().optional(),
+        batteryPercentUsed: z.number().int().min(0).max(100).optional(),
+        maxAltitudeM: z.number().int().nonnegative().optional(),
         fuelStops: z.array(FuelStopInputSchema).optional(),
         expenses: z.array(ExpenseInputSchema).optional(),
       })
@@ -78,8 +85,12 @@ export const tripRouter = createTRPCRouter({
         description: z.string().max(500).optional(),
         notes: z.string().max(2000).optional(),
         startOdometer: z.number().int().nonnegative().optional(),
-        distanceKm: z.number().int().positive().optional(),
+        distanceKm: z.number().int().nonnegative().optional(),
         startFuelLiters: z.number().nonnegative().optional(),
+        durationMin: z.number().int().positive().optional(),
+        elevationGainM: z.number().int().nonnegative().optional(),
+        batteryPercentUsed: z.number().int().min(0).max(100).optional(),
+        maxAltitudeM: z.number().int().nonnegative().optional(),
         fuelStops: z.array(FuelStopInputSchema).optional(),
         expenses: z.array(ExpenseInputSchema).optional(),
       })

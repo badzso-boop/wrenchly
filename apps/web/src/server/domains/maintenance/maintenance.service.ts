@@ -99,4 +99,12 @@ export class MaintenanceService {
   async getTotalCost(itemId: string): Promise<number> {
     return this.maintenanceRepo.sumCostByItemId(itemId)
   }
+
+  async getFrequencyByMonth(
+    itemId: string,
+    userId: string,
+    category: string
+  ): Promise<{ month: string; count: number }[]> {
+    return this.maintenanceRepo.countByCategoryPerMonth(itemId, userId, category)
+  }
 }

@@ -32,7 +32,11 @@ const mockReminderRepo = {
   update: vi.fn(),
 }
 
-const mockDb = {}
+const mockDb = {
+  boatProfile: { findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
+  bicycleProfile: { findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
+  droneProfile: { findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
+}
 
 const service = new TripService(
   mockTripRepo as any,
@@ -56,7 +60,7 @@ describe('TripService.create', () => {
   }
 
   it('computes endOdometer from startOdometer + distanceKm', async () => {
-    mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1', name: 'Test Car' })
+    mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1', name: 'Test Car', type: 'VEHICLE' })
     mockVehicleRepo.findByItemId.mockResolvedValue(null)
     mockTripRepo.create.mockResolvedValue({ id: 'trip-1' })
 
@@ -68,7 +72,7 @@ describe('TripService.create', () => {
   })
 
   it('calculates fuel totals from fuel stops', async () => {
-    mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1', name: 'Test Car' })
+    mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1', name: 'Test Car', type: 'VEHICLE' })
     mockVehicleRepo.findByItemId.mockResolvedValue(null)
     mockTripRepo.create.mockResolvedValue({ id: 'trip-1' })
 
@@ -93,7 +97,7 @@ describe('TripService.create', () => {
   })
 
   it('calculates expense totals', async () => {
-    mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1', name: 'Test Car' })
+    mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1', name: 'Test Car', type: 'VEHICLE' })
     mockVehicleRepo.findByItemId.mockResolvedValue(null)
     mockTripRepo.create.mockResolvedValue({ id: 'trip-1' })
 
@@ -111,7 +115,7 @@ describe('TripService.create', () => {
   })
 
   it('sets totals to 0 when no fuel stops or expenses', async () => {
-    mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1', name: 'Test Car' })
+    mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1', name: 'Test Car', type: 'VEHICLE' })
     mockVehicleRepo.findByItemId.mockResolvedValue(null)
     mockTripRepo.create.mockResolvedValue({ id: 'trip-1' })
 
@@ -133,7 +137,7 @@ describe('TripService.create', () => {
   })
 
   it('syncs vehicle odometer when trip end odometer is greater than current', async () => {
-    mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1', name: 'Test Car' })
+    mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1', name: 'Test Car', type: 'VEHICLE' })
     mockVehicleRepo.findByItemId.mockResolvedValue({ currentOdometer: 50000 })
     mockTripRepo.create.mockResolvedValue({ id: 'trip-1' })
 
@@ -143,7 +147,7 @@ describe('TripService.create', () => {
   })
 
   it('does not sync or throw when trip end odometer is lower than current (backfilled trip)', async () => {
-    mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1', name: 'Test Car' })
+    mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1', name: 'Test Car', type: 'VEHICLE' })
     mockVehicleRepo.findByItemId.mockResolvedValue({ currentOdometer: 60000 })
     mockTripRepo.create.mockResolvedValue({ id: 'trip-1' })
 
@@ -153,7 +157,7 @@ describe('TripService.create', () => {
   })
 
   it('skips odometer sync entirely when item has no vehicle profile', async () => {
-    mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1', name: 'Test Item' })
+    mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1', name: 'Test Item', type: 'VEHICLE' })
     mockVehicleRepo.findByItemId.mockResolvedValue(null)
     mockTripRepo.create.mockResolvedValue({ id: 'trip-1' })
 
@@ -225,5 +229,155 @@ describe('TripService.getStatistics', () => {
 
     expect(stats.allTime.distanceKm).toBe(600)
     expect(stats.last30Days.distanceKm).toBe(300)
+  })
+
+  it('computes BOAT consumption as L/hour (distanceKm holds engine hours for this type)', async () => {
+    mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1', type: 'BOAT' })
+    const now = new Date()
+    mockTripRepo.findAllByItemId.mockResolvedValue([
+      { startedAt: now, distanceKm: 10, totalFuelQty: 25, totalFuelCost: 15000, totalExpenseCost: 0 },
+    ])
+
+    const stats = await service.getStatistics('item-1', 'user-1')
+
+    expect(stats.consumptionUnit).toBe('L/hour')
+    expect(stats.allTime.avgConsumption).toBeCloseTo(2.5) // 25L / 10h
+    expect(stats.consumptionTrend[0]?.consumption).toBeCloseTo(2.5)
+  })
+
+  it('derives a BICYCLE speed trend from distance+duration, skipping rides with no duration', async () => {
+    mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1', type: 'BICYCLE' })
+    const now = new Date()
+    mockTripRepo.findAllByItemId.mockResolvedValue([
+      { startedAt: now, distanceKm: 30, durationMin: 60, totalFuelQty: 0, totalFuelCost: 0, totalExpenseCost: 0 },
+      { startedAt: now, distanceKm: 15, durationMin: null, totalFuelQty: 0, totalFuelCost: 0, totalExpenseCost: 0 },
+    ])
+
+    const stats = await service.getStatistics('item-1', 'user-1')
+
+    expect(stats.speedTrend).toHaveLength(1)
+    expect(stats.speedTrend[0]?.speedKmh).toBeCloseTo(30) // 30km in 60min = 30 km/h
+  })
+
+  it('returns a DRONE battery-used trend, skipping flights with no battery reading', async () => {
+    mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1', type: 'DRONE' })
+    const now = new Date()
+    mockTripRepo.findAllByItemId.mockResolvedValue([
+      { startedAt: now, distanceKm: 0, batteryPercentUsed: 45, totalFuelQty: 0, totalFuelCost: 0, totalExpenseCost: 0 },
+      { startedAt: now, distanceKm: 0, batteryPercentUsed: null, totalFuelQty: 0, totalFuelCost: 0, totalExpenseCost: 0 },
+    ])
+
+    const stats = await service.getStatistics('item-1', 'user-1')
+
+    expect(stats.batteryTrend).toEqual([{ date: now, batteryPercentUsed: 45 }])
+  })
+})
+
+describe('TripService non-VEHICLE profile counter sync', () => {
+  const baseInput = { itemId: 'item-1', startedAt: new Date('2026-07-01') }
+
+  it('BOAT: adds this voyage\'s hours to engineHours (read-then-write, not a blind increment)', async () => {
+    mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1', name: 'Test Boat', type: 'BOAT' })
+    mockTripRepo.create.mockResolvedValue({ id: 'trip-1' })
+    mockDb.boatProfile.findUnique.mockResolvedValue({ engineHours: 10 })
+
+    await service.create('user-1', { ...baseInput, distanceKm: 4 })
+
+    expect(mockDb.boatProfile.update).toHaveBeenCalledWith({
+      where: { itemId: 'item-1' },
+      data: { engineHours: 14 },
+    })
+  })
+
+  it('BOAT: treats a null engineHours as 0 instead of propagating NULL', async () => {
+    mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1', name: 'Test Boat', type: 'BOAT' })
+    mockTripRepo.create.mockResolvedValue({ id: 'trip-1' })
+    mockDb.boatProfile.findUnique.mockResolvedValue({ engineHours: null })
+
+    await service.create('user-1', { ...baseInput, distanceKm: 4 })
+
+    expect(mockDb.boatProfile.update).toHaveBeenCalledWith({
+      where: { itemId: 'item-1' },
+      data: { engineHours: 4 },
+    })
+  })
+
+  it('BOAT: no-ops when the item has no BoatProfile yet', async () => {
+    mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1', name: 'Test Boat', type: 'BOAT' })
+    mockTripRepo.create.mockResolvedValue({ id: 'trip-1' })
+    mockDb.boatProfile.findUnique.mockResolvedValue(null)
+
+    await expect(service.create('user-1', { ...baseInput, distanceKm: 4 })).resolves.not.toThrow()
+    expect(mockDb.boatProfile.update).not.toHaveBeenCalled()
+  })
+
+  it('BICYCLE: increments both totalKm and chainKm by the ride distance', async () => {
+    mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1', name: 'Test Bike', type: 'BICYCLE' })
+    mockTripRepo.create.mockResolvedValue({ id: 'trip-1' })
+
+    await service.create('user-1', { ...baseInput, distanceKm: 25 })
+
+    expect(mockDb.bicycleProfile.updateMany).toHaveBeenCalledWith({
+      where: { itemId: 'item-1' },
+      data: { totalKm: { increment: 25 }, chainKm: { increment: 25 } },
+    })
+  })
+
+  it('DRONE: increments totalFlights on create and adds duration to totalFlightHours', async () => {
+    mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1', name: 'Test Drone', type: 'DRONE' })
+    mockTripRepo.create.mockResolvedValue({ id: 'trip-1' })
+    mockDb.droneProfile.findUnique.mockResolvedValue({ totalFlightHours: 2 })
+
+    await service.create('user-1', { ...baseInput, durationMin: 30 })
+
+    expect(mockDb.droneProfile.updateMany).toHaveBeenCalledWith({
+      where: { itemId: 'item-1' },
+      data: { totalFlights: { increment: 1 } },
+    })
+    expect(mockDb.droneProfile.update).toHaveBeenCalledWith({
+      where: { itemId: 'item-1' },
+      data: { totalFlightHours: 2.5 }, // 2h + 30min
+    })
+  })
+
+  it('DRONE: skips the totalFlightHours read/write entirely when no duration was logged', async () => {
+    mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1', name: 'Test Drone', type: 'DRONE' })
+    mockTripRepo.create.mockResolvedValue({ id: 'trip-1' })
+
+    await service.create('user-1', baseInput)
+
+    expect(mockDb.droneProfile.updateMany).toHaveBeenCalledWith({
+      where: { itemId: 'item-1' },
+      data: { totalFlights: { increment: 1 } },
+    })
+    expect(mockDb.droneProfile.findUnique).not.toHaveBeenCalled()
+  })
+
+  it('update: applies only the delta, not the full new value, to avoid double-counting an edit', async () => {
+    mockTripRepo.findByIdAndUserId.mockResolvedValue({ id: 'trip-1', itemId: 'item-1', distanceKm: 20, durationMin: null })
+    mockItemRepo.findById.mockResolvedValue({ id: 'item-1', type: 'BICYCLE' })
+    mockTripRepo.update.mockResolvedValue({ id: 'trip-1' })
+
+    await service.update('trip-1', 'user-1', { distanceKm: 25 }) // was 20, now 25 -> delta 5
+
+    expect(mockDb.bicycleProfile.updateMany).toHaveBeenCalledWith({
+      where: { itemId: 'item-1' },
+      data: { totalKm: { increment: 5 }, chainKm: { increment: 5 } },
+    })
+  })
+
+  it("update: does not re-increment DRONE's totalFlights (a trip already counted once at creation)", async () => {
+    mockTripRepo.findByIdAndUserId.mockResolvedValue({ id: 'trip-1', itemId: 'item-1', distanceKm: 0, durationMin: 20 })
+    mockItemRepo.findById.mockResolvedValue({ id: 'item-1', type: 'DRONE' })
+    mockTripRepo.update.mockResolvedValue({ id: 'trip-1' })
+    mockDb.droneProfile.findUnique.mockResolvedValue({ totalFlightHours: 1 })
+
+    await service.update('trip-1', 'user-1', { durationMin: 40 }) // was 20, now 40 -> delta 20min
+
+    expect(mockDb.droneProfile.updateMany).not.toHaveBeenCalled()
+    expect(mockDb.droneProfile.update).toHaveBeenCalledWith({
+      where: { itemId: 'item-1' },
+      data: { totalFlightHours: 1 + 20 / 60 },
+    })
   })
 })

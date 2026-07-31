@@ -5,7 +5,7 @@ import { type ItemRepository } from '@/server/domains/item/item.repository'
 import { type VehicleRepository } from '@/server/domains/vehicle/vehicle.repository'
 import { ReminderService } from '@/server/domains/reminder/reminder.service'
 import { type ReminderRepository } from '@/server/domains/reminder/reminder.repository'
-import { type PrismaClient, type TripLog, type TripFuelStop, type TripExpense, type TripExpenseType } from '@prisma/client'
+import { type PrismaClient, type TripLog, type TripFuelStop, type TripExpense, type TripExpenseType, type ItemType } from '@prisma/client'
 
 type TripLogWithChildren = TripLog & { fuelStops: TripFuelStop[]; expenses: TripExpense[] }
 
@@ -31,6 +31,7 @@ export interface StatsBucket {
   fuelCost: number
   expenseCost: number
   avgConsumption: number
+  elevationGainM: number
 }
 
 function calculateFuelTotals(fuelStops: FuelStopInput[]) {
@@ -44,13 +45,24 @@ function calculateExpenseTotal(expenses: ExpenseInput[]) {
   return expenses.reduce((sum, e) => sum + e.amount, 0)
 }
 
-function aggregate(trips: TripLogWithChildren[]): StatsBucket {
+/** BOAT's `distanceKm` column actually holds engine hours (see trip.labels.ts) — its consumption
+ * is L/hour, a plain division, not the L/100km formula every other fuel-tracking type uses. */
+function consumptionDivisor(itemType: ItemType, distanceKm: number): number {
+  return itemType === 'BOAT' ? distanceKm : distanceKm / 100
+}
+
+function consumptionUnitFor(itemType: ItemType): string {
+  return itemType === 'BOAT' ? 'L/hour' : 'L/100km'
+}
+
+function aggregate(trips: TripLogWithChildren[], itemType: ItemType): StatsBucket {
   const distanceKm = trips.reduce((sum, t) => sum + t.distanceKm, 0)
   const fuelQty = trips.reduce((sum, t) => sum + Number(t.totalFuelQty), 0)
   const fuelCost = trips.reduce((sum, t) => sum + Number(t.totalFuelCost), 0)
   const expenseCost = trips.reduce((sum, t) => sum + Number(t.totalExpenseCost), 0)
-  const avgConsumption = distanceKm > 0 && fuelQty > 0 ? fuelQty / (distanceKm / 100) : 0
-  return { distanceKm, fuelQty, fuelCost, expenseCost, avgConsumption }
+  const elevationGainM = trips.reduce((sum, t) => sum + (t.elevationGainM ?? 0), 0)
+  const avgConsumption = distanceKm > 0 && fuelQty > 0 ? fuelQty / consumptionDivisor(itemType, distanceKm) : 0
+  return { distanceKm, fuelQty, fuelCost, expenseCost, avgConsumption, elevationGainM }
 }
 
 export class TripService {
@@ -84,9 +96,13 @@ export class TripService {
       startedAt: Date
       description?: string | null
       notes?: string | null
-      startOdometer: number
-      distanceKm: number
+      startOdometer?: number
+      distanceKm?: number
       startFuelLiters?: number | null
+      durationMin?: number | null
+      elevationGainM?: number | null
+      batteryPercentUsed?: number | null
+      maxAltitudeM?: number | null
       fuelStops?: FuelStopInput[]
       expenses?: ExpenseInput[]
     }
@@ -94,7 +110,12 @@ export class TripService {
     const item = await this.itemRepo.findByIdAndUserId(input.itemId, userId)
     if (!item) throw new TRPCError({ code: 'NOT_FOUND', message: 'errors.item.not_found' })
 
-    const endOdometer = input.startOdometer + input.distanceKm
+    // BICYCLE/DRONE have no per-trip "starting reading" concept (trip.labels.ts's
+    // showOdometerFields) and DRONE's distance is itself optional — default both to 0 so the
+    // schema's required startOdometer/distanceKm/endOdometer columns still get sane values.
+    const startOdometer = input.startOdometer ?? 0
+    const distanceKm = input.distanceKm ?? 0
+    const endOdometer = startOdometer + distanceKm
     const { withTotals: fuelStops, totalFuelQty, totalFuelCost } = calculateFuelTotals(input.fuelStops ?? [])
     const expenses = input.expenses ?? []
     const totalExpenseCost = calculateExpenseTotal(expenses)
@@ -105,10 +126,14 @@ export class TripService {
       startedAt: input.startedAt,
       description: input.description,
       notes: input.notes,
-      startOdometer: input.startOdometer,
-      distanceKm: input.distanceKm,
+      startOdometer,
+      distanceKm,
       endOdometer,
       startFuelLiters: input.startFuelLiters,
+      durationMin: input.durationMin,
+      elevationGainM: input.elevationGainM,
+      batteryPercentUsed: input.batteryPercentUsed,
+      maxAltitudeM: input.maxAltitudeM,
       totalFuelQty,
       totalFuelCost,
       totalExpenseCost,
@@ -116,7 +141,15 @@ export class TripService {
       expenses,
     })
 
-    await this.syncVehicleOdometer(input.itemId, item.name, endOdometer)
+    if (item.type === 'VEHICLE') {
+      await this.syncVehicleOdometer(input.itemId, item.name, endOdometer)
+    } else {
+      await this.syncTripTypeCounters(item.type, input.itemId, {
+        distanceKm,
+        durationMin: input.durationMin ?? 0,
+        isNewTrip: true,
+      })
+    }
 
     return trip
   }
@@ -131,6 +164,10 @@ export class TripService {
       startOdometer?: number
       distanceKm?: number
       startFuelLiters?: number | null
+      durationMin?: number | null
+      elevationGainM?: number | null
+      batteryPercentUsed?: number | null
+      maxAltitudeM?: number | null
       fuelStops?: FuelStopInput[]
       expenses?: ExpenseInput[]
     }
@@ -163,7 +200,18 @@ export class TripService {
 
     const trip = await this.tripRepo.update(id, data)
 
-    await this.syncVehicleOdometer(existing.itemId, undefined, endOdometer)
+    const item = await this.itemRepo.findById(existing.itemId)
+    if (item?.type === 'VEHICLE') {
+      await this.syncVehicleOdometer(existing.itemId, undefined, endOdometer)
+    } else if (item) {
+      const distanceDelta = distanceKm - existing.distanceKm
+      const durationDelta = (input.durationMin ?? existing.durationMin ?? 0) - (existing.durationMin ?? 0)
+      await this.syncTripTypeCounters(item.type, existing.itemId, {
+        distanceKm: distanceDelta,
+        durationMin: durationDelta,
+        isNewTrip: false,
+      })
+    }
 
     return trip
   }
@@ -180,17 +228,22 @@ export class TripService {
 
     const trips = await this.tripRepo.findAllByItemId(itemId, userId)
 
-    const allTime = aggregate(trips)
+    const allTime = aggregate(trips, item.type)
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-    const last30Days = aggregate(trips.filter((t) => t.startedAt >= thirtyDaysAgo))
+    const last30Days = aggregate(trips.filter((t) => t.startedAt >= thirtyDaysAgo), item.type)
 
-    const monthlyMap = new Map<string, { distanceKm: number; fuelCost: number; expenseCost: number }>()
+    const monthlyMap = new Map<
+      string,
+      { distanceKm: number; fuelCost: number; expenseCost: number; durationMin: number; tripCount: number }
+    >()
     for (const t of trips) {
       const key = format(t.startedAt, 'yyyy-MM')
-      const bucket = monthlyMap.get(key) ?? { distanceKm: 0, fuelCost: 0, expenseCost: 0 }
+      const bucket = monthlyMap.get(key) ?? { distanceKm: 0, fuelCost: 0, expenseCost: 0, durationMin: 0, tripCount: 0 }
       bucket.distanceKm += t.distanceKm
       bucket.fuelCost += Number(t.totalFuelCost)
       bucket.expenseCost += Number(t.totalExpenseCost)
+      bucket.durationMin += t.durationMin ?? 0
+      bucket.tripCount += 1
       monthlyMap.set(key, bucket)
     }
     const monthly = Array.from(monthlyMap.entries())
@@ -201,10 +254,29 @@ export class TripService {
       .filter((t) => Number(t.totalFuelQty) > 0 && t.distanceKm > 0)
       .map((t) => ({
         date: t.startedAt,
-        consumption: Number(t.totalFuelQty) / (t.distanceKm / 100),
+        consumption: Number(t.totalFuelQty) / consumptionDivisor(item.type, t.distanceKm),
       }))
 
-    return { allTime, last30Days, monthly, consumptionTrend, tripCount: trips.length }
+    // BICYCLE: derived average speed per ride (needs both distance and a logged duration).
+    const speedTrend = trips
+      .filter((t) => t.durationMin != null && t.durationMin > 0 && t.distanceKm > 0)
+      .map((t) => ({ date: t.startedAt, speedKmh: t.distanceKm / (t.durationMin! / 60) }))
+
+    // DRONE: battery percent used per flight.
+    const batteryTrend = trips
+      .filter((t) => t.batteryPercentUsed != null)
+      .map((t) => ({ date: t.startedAt, batteryPercentUsed: t.batteryPercentUsed! }))
+
+    return {
+      allTime,
+      last30Days,
+      monthly,
+      consumptionTrend,
+      consumptionUnit: consumptionUnitFor(item.type),
+      speedTrend,
+      batteryTrend,
+      tripCount: trips.length,
+    }
   }
 
   /**
@@ -223,5 +295,57 @@ export class TripService {
     const name = itemName ?? (await this.itemRepo.findById(itemId))?.name ?? ''
     const reminderService = new ReminderService(this.reminderRepo)
     await reminderService.dispatchOdometerTriggers(this.db, itemId, name, endOdometer)
+  }
+
+  /**
+   * BOAT/BICYCLE/DRONE profile counters, mirroring what syncVehicleOdometer does for VEHICLE but
+   * as cumulative accumulators rather than a "current state" value — so create() passes the
+   * trip's own full values as the delta, and update() passes (new - old) to avoid double-counting
+   * an edited trip. `distanceKm`/`durationMin` here are deltas, not absolute values.
+   *
+   * engineHours/totalFlightHours are nullable Decimal columns with no DB default (unlike
+   * chainKm/totalKm/totalFlights, which default to 0) — a Prisma `{ increment }` on a genuinely
+   * NULL value would silently stay NULL (SQL NULL + n = NULL), so those two go through a
+   * read-then-write instead of an atomic increment. Fine at this app's single-user scale.
+   */
+  private async syncTripTypeCounters(
+    itemType: ItemType,
+    itemId: string,
+    delta: { distanceKm: number; durationMin: number; isNewTrip: boolean }
+  ): Promise<void> {
+    if (itemType === 'BOAT') {
+      if (delta.distanceKm === 0) return
+      const profile = await this.db.boatProfile.findUnique({ where: { itemId }, select: { engineHours: true } })
+      if (!profile) return
+      await this.db.boatProfile.update({
+        where: { itemId },
+        data: { engineHours: Number(profile.engineHours ?? 0) + delta.distanceKm },
+      })
+      return
+    }
+
+    if (itemType === 'BICYCLE') {
+      if (delta.distanceKm === 0) return
+      await this.db.bicycleProfile.updateMany({
+        where: { itemId },
+        data: { totalKm: { increment: delta.distanceKm }, chainKm: { increment: delta.distanceKm } },
+      })
+      return
+    }
+
+    if (itemType === 'DRONE') {
+      if (delta.isNewTrip) {
+        await this.db.droneProfile.updateMany({ where: { itemId }, data: { totalFlights: { increment: 1 } } })
+      }
+      if (delta.durationMin !== 0) {
+        const profile = await this.db.droneProfile.findUnique({ where: { itemId }, select: { totalFlightHours: true } })
+        if (profile) {
+          await this.db.droneProfile.update({
+            where: { itemId },
+            data: { totalFlightHours: Number(profile.totalFlightHours ?? 0) + delta.durationMin / 60 },
+          })
+        }
+      }
+    }
   }
 }
