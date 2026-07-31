@@ -285,10 +285,13 @@ export class CustomDomainRepository {
     await this.db.customItemDataEntry.delete({ where: { id: entryId } })
   }
 
+  /** "Publish to the store" is the only UI path that exposes a domain outside its owner -- there's
+   * no separate visibility toggle, so publishing also flips `isPublic` (the store listing query
+   * requires both `isPublished` and `isPublic`, matching the pre-existing profile-sharing flag). */
   async publishDomain(customDomainId: string): Promise<CustomDomain> {
     return this.db.customDomain.update({
       where: { id: customDomainId },
-      data: { isPublished: true, publishedAt: new Date() },
+      data: { isPublished: true, isPublic: true, publishedAt: new Date() },
     })
   }
 
