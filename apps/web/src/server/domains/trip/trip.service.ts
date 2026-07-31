@@ -5,6 +5,7 @@ import { type ItemRepository } from '@/server/domains/item/item.repository'
 import { type VehicleRepository } from '@/server/domains/vehicle/vehicle.repository'
 import { ReminderService } from '@/server/domains/reminder/reminder.service'
 import { type ReminderRepository } from '@/server/domains/reminder/reminder.repository'
+import { type FuelUpRepository, type FuelUpWithTrips } from '@/server/domains/fuel-up/fuel-up.repository'
 import { type PrismaClient, type TripLog, type TripExpense, type TripExpenseType, type ItemType } from '@prisma/client'
 
 type TripLogWithChildren = TripLog & { expenses: TripExpense[] }
@@ -25,14 +26,6 @@ export interface StatsBucket {
   elevationGainM: number
 }
 
-// NOTE (fuel-up decoupling, fork 1 of 4 — minimum-to-compile pass only): fuel is no longer
-// entered through the trip domain at all (see the standalone FuelUp model + its own domain,
-// built by fork 2). totalFuelQty/totalFuelCost stay on TripLog for now but are never written by
-// create()/update() anymore, and getStatistics() below still reads them for OLD trips only (their
-// historical cached values survive the migration) — this is a known, temporary inconsistency:
-// aggregate()/consumptionTrend/currencies all still assume fuel lives on the trip. Rewiring all of
-// this to source from FuelUp (via the new N-N relation) is fork 2's job, not fixed here.
-
 function calculateExpenseTotal(expenses: ExpenseInput[]) {
   return expenses.reduce((sum, e) => sum + e.amount, 0)
 }
@@ -47,10 +40,15 @@ function consumptionUnitFor(itemType: ItemType): string {
   return itemType === 'BOAT' ? 'L/hour' : 'L/100km'
 }
 
-function aggregate(trips: TripLogWithChildren[], itemType: ItemType): StatsBucket {
+// Fuel numbers now come from the standalone FuelUp table (fuel-up decoupling), not from the trip
+// itself — `distanceKm`/`expenseCost` are still trip-level (unaffected by the redesign), but
+// `fuelQty`/`fuelCost` are summed across whichever FuelUps fall in the same window as the trips
+// (by FuelUp.occurredAt, the finalized "authoritative date" decision — not by which specific
+// trip(s) a fuel-up happens to be linked to, since that's an N-N assignment, not a time window).
+function aggregate(trips: TripLogWithChildren[], fuelUps: FuelUpWithTrips[], itemType: ItemType): StatsBucket {
   const distanceKm = trips.reduce((sum, t) => sum + t.distanceKm, 0)
-  const fuelQty = trips.reduce((sum, t) => sum + Number(t.totalFuelQty), 0)
-  const fuelCost = trips.reduce((sum, t) => sum + Number(t.totalFuelCost), 0)
+  const fuelQty = fuelUps.reduce((sum, f) => sum + Number(f.quantity), 0)
+  const fuelCost = fuelUps.reduce((sum, f) => sum + Number(f.totalPaid), 0)
   const expenseCost = trips.reduce((sum, t) => sum + Number(t.totalExpenseCost), 0)
   const elevationGainM = trips.reduce((sum, t) => sum + (t.elevationGainM ?? 0), 0)
   const avgConsumption = distanceKm > 0 && fuelQty > 0 ? fuelQty / consumptionDivisor(itemType, distanceKm) : 0
@@ -63,6 +61,7 @@ export class TripService {
     private itemRepo: ItemRepository,
     private vehicleRepo: VehicleRepository,
     private reminderRepo: ReminderRepository,
+    private fuelUpRepo: FuelUpRepository,
     private db: PrismaClient
   ) {}
 
@@ -124,8 +123,6 @@ export class TripService {
       elevationGainM: input.elevationGainM,
       batteryPercentUsed: input.batteryPercentUsed,
       maxAltitudeM: input.maxAltitudeM,
-      totalFuelQty: 0,
-      totalFuelCost: 0,
       totalExpenseCost,
       expenses,
     })
@@ -209,10 +206,15 @@ export class TripService {
     if (!item) throw new TRPCError({ code: 'NOT_FOUND', message: 'errors.item.not_found' })
 
     const trips = await this.tripRepo.findAllByItemId(itemId, userId)
+    const fuelUps = await this.fuelUpRepo.findAllByItemId(itemId, userId)
 
-    const allTime = aggregate(trips, item.type)
+    const allTime = aggregate(trips, fuelUps, item.type)
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-    const last30Days = aggregate(trips.filter((t) => t.startedAt >= thirtyDaysAgo), item.type)
+    const last30Days = aggregate(
+      trips.filter((t) => t.startedAt >= thirtyDaysAgo),
+      fuelUps.filter((f) => f.occurredAt >= thirtyDaysAgo),
+      item.type
+    )
 
     const monthlyMap = new Map<
       string,
@@ -222,22 +224,35 @@ export class TripService {
       const key = format(t.startedAt, 'yyyy-MM')
       const bucket = monthlyMap.get(key) ?? { distanceKm: 0, fuelCost: 0, expenseCost: 0, durationMin: 0, tripCount: 0 }
       bucket.distanceKm += t.distanceKm
-      bucket.fuelCost += Number(t.totalFuelCost)
       bucket.expenseCost += Number(t.totalExpenseCost)
       bucket.durationMin += t.durationMin ?? 0
       bucket.tripCount += 1
+      monthlyMap.set(key, bucket)
+    }
+    // Fuel cost is bucketed by FuelUp.occurredAt (the finalized "authoritative date" decision),
+    // a separate loop from trips above since a fuel-up's month doesn't have to match any of its
+    // linked trips' months.
+    for (const f of fuelUps) {
+      const key = format(f.occurredAt, 'yyyy-MM')
+      const bucket = monthlyMap.get(key) ?? { distanceKm: 0, fuelCost: 0, expenseCost: 0, durationMin: 0, tripCount: 0 }
+      bucket.fuelCost += Number(f.totalPaid)
       monthlyMap.set(key, bucket)
     }
     const monthly = Array.from(monthlyMap.entries())
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([month, v]) => ({ month, ...v }))
 
-    const consumptionTrend = trips
-      .filter((t) => Number(t.totalFuelQty) > 0 && t.distanceKm > 0)
-      .map((t) => ({
-        date: t.startedAt,
-        consumption: Number(t.totalFuelQty) / consumptionDivisor(item.type, t.distanceKm),
-      }))
+    // One point per FuelUp (not per trip) — consumption = this fuel-up's quantity divided by the
+    // combined distance of every trip it's linked to. A fuel-up with no linked trips yet is
+    // excluded (nothing to divide by); a trip linked to multiple fuel-ups deliberately has its
+    // distance counted toward each of them (an accepted approximation, see PR #15).
+    const consumptionTrend = fuelUps
+      .map((f) => {
+        const linkedDistance = f.trips.reduce((sum, t) => sum + t.distanceKm, 0)
+        if (linkedDistance <= 0) return null
+        return { date: f.occurredAt, consumption: Number(f.quantity) / consumptionDivisor(item.type, linkedDistance) }
+      })
+      .filter((p): p is { date: Date; consumption: number } => p !== null)
 
     // BICYCLE: derived average speed per ride (needs both distance and a logged duration).
     const speedTrend = trips
@@ -249,14 +264,14 @@ export class TripService {
       .filter((t) => t.batteryPercentUsed != null)
       .map((t) => ({ date: t.startedAt, batteryPercentUsed: t.batteryPercentUsed! }))
 
-    // From PR #7: which currencies actually appear across this item's expenses (only ever
-    // non-empty for VEHICLE/BOAT) — lets the UI show a real currency label, or flag mixed
-    // currencies, instead of a bare unlabeled number.
-    // TEMPORARY (fuel-up decoupling, fork 1 of 4): fuel currencies dropped out of this set since
-    // fuel no longer lives on TripLog — fork 2 must add the FuelUp table's currencies back in
-    // here once its own domain/statistics rewrite lands, or this under-reports mixed currencies
-    // for any item whose only non-HUF spend was on fuel.
-    const currencies = Array.from(new Set(trips.flatMap((t) => t.expenses.map((e) => e.currency))))
+    // From PR #7: which currencies actually appear across this item's spend (only ever non-empty
+    // for VEHICLE/BOAT) — lets the UI show a real currency label, or flag mixed currencies,
+    // instead of a bare unlabeled number. Now spans both expenses (per-trip) and fuel-ups
+    // (standalone) — fuel-up decoupling fork 1 had temporarily dropped fuel out of this set,
+    // this restores it.
+    const currencies = Array.from(
+      new Set([...trips.flatMap((t) => t.expenses.map((e) => e.currency)), ...fuelUps.map((f) => f.currency)])
+    )
 
     return {
       allTime,

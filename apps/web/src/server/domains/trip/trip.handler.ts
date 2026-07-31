@@ -5,6 +5,7 @@ import { TripService } from './trip.service'
 import { ItemRepository } from '@/server/domains/item/item.repository'
 import { VehicleRepository } from '@/server/domains/vehicle/vehicle.repository'
 import { ReminderRepository } from '@/server/domains/reminder/reminder.repository'
+import { FuelUpRepository } from '@/server/domains/fuel-up/fuel-up.repository'
 
 const ExpenseInputSchema = z.object({
   type: z.enum(['TOLL', 'VIGNETTE', 'PARKING', 'OTHER']),
@@ -18,7 +19,8 @@ function buildService(db: import('@prisma/client').PrismaClient) {
   const itemRepo = new ItemRepository(db)
   const vehicleRepo = new VehicleRepository(db)
   const reminderRepo = new ReminderRepository(db)
-  return new TripService(tripRepo, itemRepo, vehicleRepo, reminderRepo, db)
+  const fuelUpRepo = new FuelUpRepository(db)
+  return new TripService(tripRepo, itemRepo, vehicleRepo, reminderRepo, fuelUpRepo, db)
 }
 
 export const tripRouter = createTRPCRouter({

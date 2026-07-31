@@ -32,6 +32,10 @@ const mockReminderRepo = {
   update: vi.fn(),
 }
 
+const mockFuelUpRepo = {
+  findAllByItemId: vi.fn(),
+}
+
 const mockDb = {
   boatProfile: { findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
   bicycleProfile: { findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
@@ -43,12 +47,14 @@ const service = new TripService(
   mockItemRepo as any,
   mockVehicleRepo as any,
   mockReminderRepo as any,
+  mockFuelUpRepo as any,
   mockDb as any
 )
 
 beforeEach(() => {
   vi.clearAllMocks()
   mockReminderRepo.findOdometerByItemIdWithUser.mockResolvedValue([])
+  mockFuelUpRepo.findAllByItemId.mockResolvedValue([])
 })
 
 describe('TripService.create', () => {
@@ -71,9 +77,9 @@ describe('TripService.create', () => {
     )
   })
 
-  // "calculates fuel totals from fuel stops" removed — fuel is no longer entered through
-  // TripService.create() at all (see the standalone FuelUp model, fork 2 of the fuel-up
-  // decoupling initiative); create() now always passes totalFuelQty/totalFuelCost as 0.
+  // Fuel is no longer entered through TripService.create() at all — see the standalone FuelUp
+  // model + its own domain (server/domains/fuel-up/). TripLog no longer has
+  // totalFuelQty/totalFuelCost columns at all (removed, not just zeroed).
 
   it('calculates expense totals', async () => {
     mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1', name: 'Test Car', type: 'VEHICLE' })
@@ -93,16 +99,17 @@ describe('TripService.create', () => {
     )
   })
 
-  it('sets totals to 0 when no fuel stops or expenses', async () => {
+  it('sets expense total to 0 when no expenses given, and never passes fuel fields', async () => {
     mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1', name: 'Test Car', type: 'VEHICLE' })
     mockVehicleRepo.findByItemId.mockResolvedValue(null)
     mockTripRepo.create.mockResolvedValue({ id: 'trip-1' })
 
     await service.create('user-1', baseInput)
 
-    expect(mockTripRepo.create).toHaveBeenCalledWith(
-      expect.objectContaining({ totalFuelQty: 0, totalFuelCost: 0, totalExpenseCost: 0 })
-    )
+    const call = mockTripRepo.create.mock.calls[0]?.[0]
+    expect(call.totalExpenseCost).toBe(0)
+    expect(call).not.toHaveProperty('totalFuelQty')
+    expect(call).not.toHaveProperty('totalFuelCost')
   })
 
   it('throws NOT_FOUND when item is not owned by user', async () => {
@@ -169,12 +176,15 @@ describe('TripService.getStatistics', () => {
     await expect(service.getStatistics('item-1', 'user-1')).rejects.toMatchObject({ code: 'NOT_FOUND' })
   })
 
-  it('computes average consumption as L/100km across all trips', async () => {
-    mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1' })
+  it('computes average consumption as L/100km, fuel sourced from FuelUp not TripLog', async () => {
+    mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1', type: 'VEHICLE' })
     const now = new Date()
     mockTripRepo.findAllByItemId.mockResolvedValue([
-      { startedAt: now, distanceKm: 500, totalFuelQty: 35, totalFuelCost: 21000, totalExpenseCost: 0, expenses: []  },
-      { startedAt: now, distanceKm: 500, totalFuelQty: 35, totalFuelCost: 21000, totalExpenseCost: 0, expenses: []  },
+      { startedAt: now, distanceKm: 500, totalExpenseCost: 0, expenses: [] },
+      { startedAt: now, distanceKm: 500, totalExpenseCost: 0, expenses: [] },
+    ])
+    mockFuelUpRepo.findAllByItemId.mockResolvedValue([
+      { occurredAt: now, quantity: 70, totalPaid: 42000, currency: 'HUF', trips: [] },
     ])
 
     const stats = await service.getStatistics('item-1', 'user-1')
@@ -182,6 +192,7 @@ describe('TripService.getStatistics', () => {
     // 70 liters / (1000km / 100) = 7 L/100km
     expect(stats.allTime.avgConsumption).toBeCloseTo(7)
     expect(stats.allTime.distanceKm).toBe(1000)
+    expect(stats.allTime.fuelCost).toBe(42000)
     expect(stats.tripCount).toBe(2)
   })
 
@@ -195,26 +206,32 @@ describe('TripService.getStatistics', () => {
     expect(stats.last30Days.avgConsumption).toBe(0)
   })
 
-  it('excludes trips older than 30 days from the last30Days bucket', async () => {
+  it('excludes trips AND fuel-ups older than 30 days from the last30Days bucket (each by its own date)', async () => {
     mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1' })
     const recent = new Date()
     const old = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000)
     mockTripRepo.findAllByItemId.mockResolvedValue([
-      { startedAt: recent, distanceKm: 300, totalFuelQty: 21, totalFuelCost: 12600, totalExpenseCost: 0, expenses: []  },
-      { startedAt: old, distanceKm: 300, totalFuelQty: 21, totalFuelCost: 12600, totalExpenseCost: 0, expenses: []  },
+      { startedAt: recent, distanceKm: 300, totalExpenseCost: 0, expenses: [] },
+      { startedAt: old, distanceKm: 300, totalExpenseCost: 0, expenses: [] },
+    ])
+    mockFuelUpRepo.findAllByItemId.mockResolvedValue([
+      { occurredAt: recent, quantity: 21, totalPaid: 12600, currency: 'HUF', trips: [] },
+      { occurredAt: old, quantity: 21, totalPaid: 12600, currency: 'HUF', trips: [] },
     ])
 
     const stats = await service.getStatistics('item-1', 'user-1')
 
     expect(stats.allTime.distanceKm).toBe(600)
     expect(stats.last30Days.distanceKm).toBe(300)
+    expect(stats.allTime.fuelCost).toBe(25200)
+    expect(stats.last30Days.fuelCost).toBe(12600)
   })
 
-  it('reports a single currency from expenses', async () => {
+  it('reports a single currency from expenses when there are no fuel-ups', async () => {
     mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1' })
     mockTripRepo.findAllByItemId.mockResolvedValue([
       {
-        startedAt: new Date(), distanceKm: 300, totalFuelQty: 20, totalFuelCost: 12000, totalExpenseCost: 1000,
+        startedAt: new Date(), distanceKm: 300, totalExpenseCost: 1000,
         expenses: [{ currency: 'HUF' }],
       },
     ])
@@ -228,7 +245,7 @@ describe('TripService.getStatistics', () => {
     mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1' })
     mockTripRepo.findAllByItemId.mockResolvedValue([
       {
-        startedAt: new Date(), distanceKm: 300, totalFuelQty: 20, totalFuelCost: 12000, totalExpenseCost: 1000,
+        startedAt: new Date(), distanceKm: 300, totalExpenseCost: 1000,
         expenses: [{ currency: 'EUR' }, { currency: 'HUF' }],
       },
     ])
@@ -238,15 +255,28 @@ describe('TripService.getStatistics', () => {
     expect(stats.currencies.sort()).toEqual(['EUR', 'HUF'])
   })
 
-  // NOTE (fuel-up decoupling, fork 1 of 4): `currencies` temporarily only reflects expense
-  // currencies, not fuel — fuel no longer lives on TripLog (see the new FuelUp model). Fork 2
-  // must extend this once it rewires getStatistics() to source fuel data from FuelUp.
+  it('includes fuel-up currencies alongside expense currencies (restored after fork 1 temporarily dropped them)', async () => {
+    mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1' })
+    mockTripRepo.findAllByItemId.mockResolvedValue([
+      { startedAt: new Date(), distanceKm: 300, totalExpenseCost: 0, expenses: [{ currency: 'HUF' }] },
+    ])
+    mockFuelUpRepo.findAllByItemId.mockResolvedValue([
+      { occurredAt: new Date(), quantity: 10, totalPaid: 6000, currency: 'USD', trips: [] },
+    ])
+
+    const stats = await service.getStatistics('item-1', 'user-1')
+
+    expect(stats.currencies.sort()).toEqual(['HUF', 'USD'])
+  })
 
   it('computes BOAT consumption as L/hour (distanceKm holds engine hours for this type)', async () => {
     mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1', type: 'BOAT' })
     const now = new Date()
     mockTripRepo.findAllByItemId.mockResolvedValue([
-      { startedAt: now, distanceKm: 10, totalFuelQty: 25, totalFuelCost: 15000, totalExpenseCost: 0, expenses: []  },
+      { id: 'trip-1', startedAt: now, distanceKm: 10, totalExpenseCost: 0, expenses: [] },
+    ])
+    mockFuelUpRepo.findAllByItemId.mockResolvedValue([
+      { occurredAt: now, quantity: 25, totalPaid: 15000, currency: 'HUF', trips: [{ id: 'trip-1', startedAt: now, distanceKm: 10 }] },
     ])
 
     const stats = await service.getStatistics('item-1', 'user-1')
@@ -256,12 +286,72 @@ describe('TripService.getStatistics', () => {
     expect(stats.consumptionTrend[0]?.consumption).toBeCloseTo(2.5)
   })
 
+  it('consumptionTrend: one point per FuelUp, using the combined distance of every trip it covers', async () => {
+    mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1', type: 'VEHICLE' })
+    const now = new Date()
+    mockTripRepo.findAllByItemId.mockResolvedValue([
+      { id: 'trip-1', startedAt: now, distanceKm: 200, totalExpenseCost: 0, expenses: [] },
+      { id: 'trip-2', startedAt: now, distanceKm: 300, totalExpenseCost: 0, expenses: [] },
+    ])
+    // One fuel-up covers BOTH trips (the exact Norbert scenario: drive around, refuel once).
+    mockFuelUpRepo.findAllByItemId.mockResolvedValue([
+      {
+        occurredAt: now,
+        quantity: 40,
+        totalPaid: 24000,
+        currency: 'HUF',
+        trips: [
+          { id: 'trip-1', startedAt: now, distanceKm: 200 },
+          { id: 'trip-2', startedAt: now, distanceKm: 300 },
+        ],
+      },
+    ])
+
+    const stats = await service.getStatistics('item-1', 'user-1')
+
+    expect(stats.consumptionTrend).toHaveLength(1)
+    // 40L / (500km / 100) = 8 L/100km — based on the COMBINED distance, not either trip alone.
+    expect(stats.consumptionTrend[0]?.consumption).toBeCloseTo(8)
+  })
+
+  it('consumptionTrend: excludes a fuel-up with zero linked trips instead of dividing by zero', async () => {
+    mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1', type: 'VEHICLE' })
+    const now = new Date()
+    mockTripRepo.findAllByItemId.mockResolvedValue([])
+    mockFuelUpRepo.findAllByItemId.mockResolvedValue([
+      { occurredAt: now, quantity: 40, totalPaid: 24000, currency: 'HUF', trips: [] },
+    ])
+
+    const stats = await service.getStatistics('item-1', 'user-1')
+
+    expect(stats.consumptionTrend).toHaveLength(0)
+  })
+
+  it('consumptionTrend: a trip linked to two fuel-ups contributes its distance to each independently (accepted approximation)', async () => {
+    mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1', type: 'VEHICLE' })
+    const now = new Date()
+    const sharedTrip = { id: 'trip-1', startedAt: now, distanceKm: 100 }
+    mockTripRepo.findAllByItemId.mockResolvedValue([{ ...sharedTrip, totalExpenseCost: 0, expenses: [] }])
+    mockFuelUpRepo.findAllByItemId.mockResolvedValue([
+      { occurredAt: now, quantity: 5, totalPaid: 3000, currency: 'HUF', trips: [sharedTrip] },
+      { occurredAt: now, quantity: 10, totalPaid: 6000, currency: 'HUF', trips: [sharedTrip] },
+    ])
+
+    const stats = await service.getStatistics('item-1', 'user-1')
+
+    expect(stats.consumptionTrend).toHaveLength(2)
+    // Each fuel-up's own consumption is still correct in isolation, even though trip-1's 100km
+    // is counted toward both — this is the documented, accepted N-N trade-off (PR #15).
+    expect(stats.consumptionTrend[0]?.consumption).toBeCloseTo(5) // 5L / 1
+    expect(stats.consumptionTrend[1]?.consumption).toBeCloseTo(10) // 10L / 1
+  })
+
   it('derives a BICYCLE speed trend from distance+duration, skipping rides with no duration', async () => {
     mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1', type: 'BICYCLE' })
     const now = new Date()
     mockTripRepo.findAllByItemId.mockResolvedValue([
-      { startedAt: now, distanceKm: 30, durationMin: 60, totalFuelQty: 0, totalFuelCost: 0, totalExpenseCost: 0, expenses: []  },
-      { startedAt: now, distanceKm: 15, durationMin: null, totalFuelQty: 0, totalFuelCost: 0, totalExpenseCost: 0, expenses: []  },
+      { startedAt: now, distanceKm: 30, durationMin: 60, totalExpenseCost: 0, expenses: [] },
+      { startedAt: now, distanceKm: 15, durationMin: null, totalExpenseCost: 0, expenses: [] },
     ])
 
     const stats = await service.getStatistics('item-1', 'user-1')
@@ -274,8 +364,8 @@ describe('TripService.getStatistics', () => {
     mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1', type: 'DRONE' })
     const now = new Date()
     mockTripRepo.findAllByItemId.mockResolvedValue([
-      { startedAt: now, distanceKm: 0, batteryPercentUsed: 45, totalFuelQty: 0, totalFuelCost: 0, totalExpenseCost: 0, expenses: []  },
-      { startedAt: now, distanceKm: 0, batteryPercentUsed: null, totalFuelQty: 0, totalFuelCost: 0, totalExpenseCost: 0, expenses: []  },
+      { startedAt: now, distanceKm: 0, batteryPercentUsed: 45, totalExpenseCost: 0, expenses: [] },
+      { startedAt: now, distanceKm: 0, batteryPercentUsed: null, totalExpenseCost: 0, expenses: [] },
     ])
 
     const stats = await service.getStatistics('item-1', 'user-1')
