@@ -60,15 +60,27 @@ export class CustomDomainService {
       order?: number
     }
   ) {
-    await this.assertDomainOwnership(customDomainId, userId)
+    const domain = await this.assertDomainOwnership(customDomainId, userId)
+    this.assertNotPublished(domain)
     return this.domainRepo.addField(customDomainId, { ...input, key: slugifyKey(input.name) })
   }
 
   async removeField(fieldId: string, userId: string): Promise<void> {
     const field = await this.domainRepo.findFieldById(fieldId)
     if (!field) throw new TRPCError({ code: 'NOT_FOUND', message: 'errors.custom_domain.field_not_found' })
-    await this.assertDomainOwnership(field.customDomainId, userId)
+    const domain = await this.assertDomainOwnership(field.customDomainId, userId)
+    this.assertNotPublished(domain)
     await this.domainRepo.removeField(fieldId)
+  }
+
+  /** Publishing locks the WHOLE domain's field structure, profile fields included, not just the
+   * loggable Log-tab fields -- a deliberate simplicity choice (one lock, one mental model) rather
+   * than letting profile fields stay editable after publish. Flagging as a judgment call: revisit
+   * if this turns out to be too restrictive for real usage. */
+  private assertNotPublished(domain: CustomDomainWithFields): void {
+    if (domain.isPublished) {
+      throw new TRPCError({ code: 'FORBIDDEN', message: 'errors.custom_domain.published_locked' })
+    }
   }
 
   async getItemData(itemId: string, userId: string) {

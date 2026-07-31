@@ -108,15 +108,17 @@ model Item {
   createdAt         DateTime   @default(now())
   updatedAt         DateTime   @updatedAt
 
-  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  parentItem         Item?               @relation("ItemChildren", fields: [parentItemId], references: [id])
-  childItems         Item[]              @relation("ItemChildren")
-  maintenanceRecords MaintenanceRecord[]
-  reminders          Reminder[]
-  photos             Photo[]
-  shareExports       ShareExport[]
-  tripLogs           TripLog[]
-  readings           ItemReading[]
+  user                  User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parentItem            Item?                 @relation("ItemChildren", fields: [parentItemId], references: [id])
+  childItems            Item[]                @relation("ItemChildren")
+  maintenanceRecords    MaintenanceRecord[]
+  reminders             Reminder[]
+  photos                Photo[]
+  shareExports          ShareExport[]
+  tripLogs              TripLog[]
+  readings              ItemReading[]
+  printJobs             PrintJob[]
+  customItemDataEntries CustomItemDataEntry[]
 
   vehicleProfile    VehicleProfile?
   propertyProfile   PropertyProfile?
@@ -293,6 +295,26 @@ model ItemReading {
 
   @@index([itemId, recordedAt])
   @@map("item_readings")
+}
+
+model PrintJob {
+  id            String   @id @default(cuid())
+  itemId        String
+  userId        String
+  startedAt     DateTime
+  durationMin   Int?
+  filamentGrams Int
+  materialType  String // free string (PLA/PETG/ABS/TPU/Resin/Other), not a DB enum -- same
+  // convention as maintenance.category, so the value list can grow
+  // without a migration
+  success       Boolean  @default(true)
+  notes         String?
+  createdAt     DateTime @default(now())
+
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([itemId, startedAt])
+  @@map("print_jobs")
 }
 
 model Photo {
@@ -686,18 +708,24 @@ model SolarProfile {
 // ─── CUSTOM DOMAIN ───────────────────────────────────────────────────────────
 
 model CustomDomain {
-  id       String  @id @default(cuid())
-  userId   String
-  name     String
-  icon     String?
-  isPublic Boolean @default(false)
+  id             String    @id @default(cuid())
+  userId         String
+  name           String
+  icon           String?
+  isPublic       Boolean   @default(false)
+  isPublished    Boolean   @default(false)
+  publishedAt    DateTime?
+  sourceDomainId String? // id of the CustomDomain this was imported/cloned from, if any — plain
+  // pointer, deliberately not an enforced FK relation given the existing per-user scoping
 
-  user   User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  fields CustomDomainField[]
-  items  CustomItemData[]
+  user                  User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fields                CustomDomainField[]
+  items                 CustomItemData[]
+  customItemDataEntries CustomItemDataEntry[]
 
   @@index([userId])
   @@index([isPublic])
+  @@index([isPublished])
   @@map("custom_domains")
 }
 
@@ -711,11 +739,30 @@ model CustomDomainField {
   required       Boolean   @default(false)
   options        String[]
   order          Int       @default(0)
+  widthCols      Int       @default(2) // 1 (half of the Log-tab's 2-col grid) or 2 (full width)
+  loggable       Boolean   @default(false) // appears on the recurring Log tab, not just Profile
+  archivedAt     DateTime? // soft-delete: hides from the active builder/form, keeps historical values
 
-  customDomain CustomDomain @relation(fields: [customDomainId], references: [id], onDelete: Cascade)
+  customDomain CustomDomain             @relation(fields: [customDomainId], references: [id], onDelete: Cascade)
+  fieldConfig  CustomDomainFieldConfig?
+  fieldValues  CustomDomainFieldValue[]
 
   @@index([customDomainId])
   @@map("custom_domain_fields")
+}
+
+model CustomDomainFieldConfig {
+  id            String   @id @default(cuid())
+  fieldId       String   @unique
+  minValue      Decimal? @db.Decimal(18, 6)
+  maxValue      Decimal? @db.Decimal(18, 6)
+  decimalPlaces Int?
+  maxLength     Int?
+  helpText      String?
+
+  field CustomDomainField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+
+  @@map("custom_domain_field_configs")
 }
 
 enum FieldType {
@@ -725,6 +772,10 @@ enum FieldType {
   BOOLEAN
   ENUM
   URL
+  LONG_TEXT
+  DECIMAL
+  RADIO
+  CHECKBOXES
 }
 
 model CustomItemData {
@@ -736,6 +787,43 @@ model CustomItemData {
   customDomain CustomDomain @relation(fields: [customDomainId], references: [id])
 
   @@map("custom_item_data")
+}
+
+// The repeatable "Log tab" container — CustomItemData (above) stays a single snapshot for the
+// Profile tab; this is the new sibling for recurring, timestamped Log-tab entries.
+model CustomItemDataEntry {
+  id             String   @id @default(cuid())
+  itemId         String
+  customDomainId String
+  userId         String
+  recordedAt     DateTime
+  createdAt      DateTime @default(now())
+
+  item         Item                     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  customDomain CustomDomain             @relation(fields: [customDomainId], references: [id], onDelete: Cascade)
+  values       CustomDomainFieldValue[]
+
+  @@index([itemId, recordedAt])
+  @@map("custom_item_data_entries")
+}
+
+model CustomDomainFieldValue {
+  id           String    @id @default(cuid())
+  entryId      String
+  fieldId      String
+  valueString  String? // TEXT/LONG_TEXT/ENUM(dropdown)/RADIO — one of the field's `options` for the latter two
+  valueNumber  Decimal?  @db.Decimal(18, 6) // NUMBER and DECIMAL both use this
+  valueBoolean Boolean?
+  valueDate    DateTime?
+  valueJson    Json? // CHECKBOXES only — string[] of selected options; deliberately non-EAV-pure,
+  // to avoid multi-row-grouping logic for this one multi-select case
+
+  entry CustomItemDataEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  field CustomDomainField   @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+
+  @@unique([entryId, fieldId])
+  @@index([fieldId])
+  @@map("custom_domain_field_values")
 }
 
 // ─── ONBOARDING ──────────────────────────────────────────────────────────────

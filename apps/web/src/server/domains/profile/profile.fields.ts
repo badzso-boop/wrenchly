@@ -9,6 +9,11 @@ export interface ProfileFieldDef {
   required?: boolean
   unit?: string
   options?: string[]
+  // True for a field that's really just this item type's own name (e.g. PET's "Pet name") —
+  // duplicates the item's own `name`. The item-creation wizard skips asking for these
+  // separately and fills them in from the item name instead; the Profile edit page still
+  // shows/allows changing them afterward in case someone genuinely wants them to differ.
+  mirrorsItemName?: boolean
 }
 
 // Item types with their own bespoke domain (VEHICLE) or no extended profile at all
@@ -65,7 +70,7 @@ export const PROFILE_FIELDS: Partial<Record<ItemType, ProfileFieldDef[]>> = {
     { key: 'filamentConsumedG', label: 'Filament consumed', type: 'number', unit: 'g' },
   ],
   PET: [
-    { key: 'petName', label: 'Pet name', type: 'text', required: true },
+    { key: 'petName', label: 'Pet name', type: 'text', required: true, mirrorsItemName: true },
     { key: 'species', label: 'Species', type: 'text' },
     { key: 'breed', label: 'Breed', type: 'text' },
     { key: 'dateOfBirth', label: 'Date of birth', type: 'date' },

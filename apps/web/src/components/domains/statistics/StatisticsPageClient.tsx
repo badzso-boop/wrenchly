@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { TripStatisticsClient } from './TripStatisticsClient'
 import { ReadingStatisticsClient } from './ReadingStatisticsClient'
+import { PrintJobStatisticsClient } from './PrintJobStatisticsClient'
 import { isTripLogItemType } from '@/server/domains/trip/trip.labels'
 import { Button } from '@/components/ui/button'
 
@@ -25,6 +26,8 @@ export function StatisticsPageClient({ itemId }: { itemId: string }) {
         <div className="max-w-2xl mx-auto">
           {item.data && isTripLogItemType(item.data.type) ? (
             <TripStatisticsClient itemId={itemId} itemType={item.data.type} />
+          ) : item.data?.type === 'PRINTER_3D' ? (
+            <PrintJobStatisticsClient itemId={itemId} />
           ) : item.data ? (
             <ReadingStatisticsClient itemId={itemId} itemType={item.data.type} />
           ) : null}
