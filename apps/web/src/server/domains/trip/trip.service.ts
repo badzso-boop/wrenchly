@@ -85,6 +85,7 @@ export class TripService {
     input: {
       itemId: string
       startedAt: Date
+      endedAt?: Date | null
       description?: string | null
       notes?: string | null
       startOdometer?: number
@@ -113,6 +114,7 @@ export class TripService {
       userId,
       itemId: input.itemId,
       startedAt: input.startedAt,
+      endedAt: input.endedAt,
       description: input.description,
       notes: input.notes,
       startOdometer,
@@ -145,6 +147,7 @@ export class TripService {
     userId: string,
     input: {
       startedAt?: Date
+      endedAt?: Date | null
       description?: string | null
       notes?: string | null
       startOdometer?: number

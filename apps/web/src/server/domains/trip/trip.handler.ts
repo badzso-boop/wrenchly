@@ -49,6 +49,7 @@ export const tripRouter = createTRPCRouter({
       z.object({
         itemId: z.string(),
         startedAt: z.coerce.date(),
+        endedAt: z.coerce.date().optional(),
         description: z.string().max(500).optional(),
         notes: z.string().max(2000).optional(),
         // Optional: BICYCLE/DRONE have no per-trip "starting reading" concept (see
@@ -74,6 +75,7 @@ export const tripRouter = createTRPCRouter({
       z.object({
         id: z.string(),
         startedAt: z.coerce.date().optional(),
+        endedAt: z.coerce.date().optional(),
         description: z.string().max(500).optional(),
         notes: z.string().max(2000).optional(),
         startOdometer: z.number().int().nonnegative().optional(),
