@@ -38,6 +38,7 @@ export function AddTripLogForm({ itemId, itemType, onSuccess }: { itemId: string
   const isVehicle = itemType === 'VEHICLE'
   const profile = api.vehicle.getByItemId.useQuery({ itemId }, { enabled: isVehicle })
   const [startedAt, setStartedAt] = useState(new Date().toISOString().slice(0, 10))
+  const [endedAt, setEndedAt] = useState('')
   const [startOdometer, setStartOdometer] = useState('')
   const [distanceKm, setDistanceKm] = useState('')
   const [durationMin, setDurationMin] = useState('')
@@ -79,6 +80,7 @@ export function AddTripLogForm({ itemId, itemType, onSuccess }: { itemId: string
     createTrip.mutate({
       itemId,
       startedAt: new Date(startedAt),
+      endedAt: endedAt ? new Date(endedAt) : undefined,
       description: description || undefined,
       notes: notes || undefined,
       startOdometer: labels!.showOdometerFields ? Number(startOdometer) : undefined,
@@ -114,6 +116,10 @@ export function AddTripLogForm({ itemId, itemType, onSuccess }: { itemId: string
             <div className="space-y-2">
               <Label htmlFor="trip-desc">Purpose / description</Label>
               <Input id="trip-desc" value={description} onChange={(e) => setDescription((e.target as HTMLInputElement).value)} placeholder="e.g. Trip to Vienna" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="trip-end-date">End date</Label>
+              <DateField id="trip-end-date" value={endedAt} onChange={setEndedAt} />
             </div>
           </div>
 
