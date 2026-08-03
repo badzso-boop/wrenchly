@@ -224,6 +224,7 @@ model TripLog {
   itemId             String
   userId             String
   startedAt          DateTime
+  endedAt            DateTime?
   description        String?
   notes              String?
   startOdometer      Int
