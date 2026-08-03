@@ -7,6 +7,7 @@ interface FuelUpCreateInput {
   occurredAt: Date
   quantity: number
   unit?: string
+  isFullTank?: boolean
   pricePerUnit: number
   currency?: string
   fuelType?: string | null
@@ -19,6 +20,7 @@ interface FuelUpUpdateInput {
   occurredAt?: Date
   quantity?: number
   unit?: string
+  isFullTank?: boolean
   pricePerUnit?: number
   currency?: string
   fuelType?: string | null
@@ -53,6 +55,7 @@ export class FuelUpService {
       occurredAt: input.occurredAt,
       quantity,
       unit: input.unit ?? 'liter',
+      isFullTank: input.isFullTank ?? true,
       pricePerUnit,
       totalPaid: quantity * pricePerUnit,
       currency: input.currency ?? 'HUF',
@@ -76,6 +79,7 @@ export class FuelUpService {
       occurredAt: input.occurredAt,
       quantity: input.quantity,
       unit: input.unit,
+      isFullTank: input.isFullTank,
       pricePerUnit: input.pricePerUnit,
       totalPaid: recomputeTotalPaid ? quantity * pricePerUnit : undefined,
       currency: input.currency,
