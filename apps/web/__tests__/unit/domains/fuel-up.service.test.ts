@@ -73,6 +73,24 @@ describe('FuelUpService.create', () => {
     expect(mockRepo.create).toHaveBeenCalledWith(expect.objectContaining({ unit: 'liter', currency: 'HUF' }))
   })
 
+  it('defaults isFullTank to true when omitted (every fuel-up is assumed a full tank unless said otherwise)', async () => {
+    mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1', type: 'VEHICLE' })
+    mockRepo.create.mockResolvedValue({ id: 'fu-1' })
+
+    await service.create('user-1', baseInput)
+
+    expect(mockRepo.create).toHaveBeenCalledWith(expect.objectContaining({ isFullTank: true }))
+  })
+
+  it('respects an explicit isFullTank: false (a partial top-up)', async () => {
+    mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1', type: 'VEHICLE' })
+    mockRepo.create.mockResolvedValue({ id: 'fu-1' })
+
+    await service.create('user-1', { ...baseInput, isFullTank: false })
+
+    expect(mockRepo.create).toHaveBeenCalledWith(expect.objectContaining({ isFullTank: false }))
+  })
+
   it('rejects a tripId that does not belong to the same item/user', async () => {
     mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1', type: 'VEHICLE' })
     mockRepo.listTripsForItem.mockResolvedValue([{ id: 'trip-1', startedAt: new Date(), distanceKm: 100, fuelUps: [] }])
