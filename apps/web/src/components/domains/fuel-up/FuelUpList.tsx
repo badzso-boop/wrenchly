@@ -15,11 +15,14 @@ import { FUEL_TYPES } from '@/components/domains/vehicle/VehicleProfileFields'
 import { CURRENCIES } from './AddFuelUpForm'
 import type { FuelUp } from '@prisma/client'
 
-type FuelUpWithTrips = FuelUp & { trips: { id: string; startedAt: Date; distanceKm: number }[] }
+type FuelUpWithTrips = FuelUp & {
+  trips: { id: string; startedAt: Date; distanceKm: number; description: string | null }[]
+}
 
 function EditFuelUpForm({ itemId, fuelUp, onDone }: { itemId: string; fuelUp: FuelUpWithTrips; onDone: () => void }) {
   const utils = api.useUtils()
   const [occurredAt, setOccurredAt] = useState(new Date(fuelUp.occurredAt).toISOString().slice(0, 10))
+  const [isFullTank, setIsFullTank] = useState(fuelUp.isFullTank)
   const [quantity, setQuantity] = useState(String(fuelUp.quantity))
   const [pricePerUnit, setPricePerUnit] = useState(String(fuelUp.pricePerUnit))
   const [currency, setCurrency] = useState(fuelUp.currency)
@@ -48,6 +51,7 @@ function EditFuelUpForm({ itemId, fuelUp, onDone }: { itemId: string; fuelUp: Fu
     updateFuelUp.mutate({
       id: fuelUp.id,
       occurredAt: new Date(occurredAt),
+      isFullTank,
       quantity: Number(quantity),
       pricePerUnit: Number(pricePerUnit),
       currency,
@@ -81,6 +85,21 @@ function EditFuelUpForm({ itemId, fuelUp, onDone }: { itemId: string; fuelUp: Fu
           <Input id={`edit-fuelup-price-${fuelUp.id}`} type="number" value={pricePerUnit} onChange={(e) => setPricePerUnit((e.target as HTMLInputElement).value)} min="0" step="0.01" required />
         </div>
       </div>
+
+      <label className="flex items-start gap-2.5 text-sm cursor-pointer">
+        <input
+          type="checkbox"
+          checked={isFullTank}
+          onChange={(e) => setIsFullTank((e.target as HTMLInputElement).checked)}
+          className="h-4 w-4 mt-0.5 rounded border-input"
+        />
+        <span>
+          Filled the tank all the way up
+          <span className="block text-xs text-muted-foreground">
+            Uncheck for a partial top-up — average consumption is only calculated between full tanks.
+          </span>
+        </span>
+      </label>
 
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
@@ -123,7 +142,8 @@ function EditFuelUpForm({ itemId, fuelUp, onDone }: { itemId: string; fuelUp: Fu
                   className="h-4 w-4 rounded border-input"
                 />
                 <span className="flex-1">
-                  {new Date(trip.startedAt).toLocaleDateString()} — {trip.distanceKm.toLocaleString()} km
+                  {new Date(trip.startedAt).toLocaleDateString()}
+                  {trip.description ? ` — ${trip.description}` : ''} — {trip.distanceKm.toLocaleString()} km
                 </span>
                 {trip.fuelUps.length > 0 && !trip.fuelUps.every((f) => f.id === fuelUp.id) && (
                   <span className="text-xs text-muted-foreground">also covered elsewhere</span>
@@ -216,6 +236,10 @@ export function FuelUpList({ itemId, fuelUps }: { itemId: string; fuelUps: FuelU
                       <p className="text-muted-foreground text-xs mb-0.5">Price per unit</p>
                       <p className="font-medium">{Number(fuelUp.pricePerUnit).toLocaleString()} {fuelUp.currency}</p>
                     </div>
+                    <div>
+                      <p className="text-muted-foreground text-xs mb-0.5">Fill type</p>
+                      <p className="font-medium">{fuelUp.isFullTank ? 'Full tank' : 'Partial'}</p>
+                    </div>
                     {fuelUp.fuelType && (
                       <div>
                         <p className="text-muted-foreground text-xs mb-0.5">Fuel type</p>
@@ -230,7 +254,10 @@ export function FuelUpList({ itemId, fuelUps }: { itemId: string; fuelUps: FuelU
                       <div className="space-y-1">
                         {fuelUp.trips.map((t) => (
                           <div key={t.id} className="flex items-center justify-between text-sm">
-                            <span>{new Date(t.startedAt).toLocaleDateString()}</span>
+                            <span>
+                              {new Date(t.startedAt).toLocaleDateString()}
+                              {t.description ? ` — ${t.description}` : ''}
+                            </span>
                             <span className="text-muted-foreground">{t.distanceKm.toLocaleString()} km</span>
                           </div>
                         ))}
