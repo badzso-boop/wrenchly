@@ -224,6 +224,7 @@ model TripLog {
   itemId             String
   userId             String
   startedAt          DateTime
+  endedAt            DateTime?
   description        String?
   notes              String?
   startOdometer      Int
@@ -253,6 +254,12 @@ model TripLog {
 // and one trip can still have multiple fuel-ups (e.g. two top-ups on one long journey) — this
 // generalizes what the old per-trip TripFuelStop supported as its 1-fuel-up-per-trip special
 // case. Only ever used by VEHICLE/BOAT (trip.labels.ts's showFuelSection).
+//
+// isFullTank drives the "full-to-full" consumption method in trip.service.ts: a partial
+// top-up's own liters don't mean anything on their own (you don't know what a partial fill
+// covers), so they're pooled forward until the next full tank, which is the only point where
+// total liters consumed since the last full tank is actually knowable. Defaults to true since
+// every fuel-up recorded before this column existed was, in practice, a full tank.
 model FuelUp {
   id           String   @id @default(cuid())
   itemId       String
@@ -260,6 +267,7 @@ model FuelUp {
   occurredAt   DateTime
   quantity     Decimal  @db.Decimal(7, 3)
   unit         String   @default("liter")
+  isFullTank   Boolean  @default(true)
   pricePerUnit Decimal  @db.Decimal(10, 2)
   totalPaid    Decimal  @db.Decimal(10, 2)
   currency     String   @default("HUF")

@@ -40,18 +40,64 @@ function consumptionUnitFor(itemType: ItemType): string {
   return itemType === 'BOAT' ? 'L/hour' : 'L/100km'
 }
 
-// Fuel numbers now come from the standalone FuelUp table (fuel-up decoupling), not from the trip
-// itself — `distanceKm`/`expenseCost` are still trip-level (unaffected by the redesign), but
-// `fuelQty`/`fuelCost` are summed across whichever FuelUps fall in the same window as the trips
-// (by FuelUp.occurredAt, the finalized "authoritative date" decision — not by which specific
-// trip(s) a fuel-up happens to be linked to, since that's an N-N assignment, not a time window).
-function aggregate(trips: TripLogWithChildren[], fuelUps: FuelUpWithTrips[], itemType: ItemType): StatsBucket {
+interface FullTankWindow {
+  date: Date
+  fuelQty: number
+  distanceKm: number
+}
+
+// The "full-to-full" method: a full tank is the one reproducible reference level, so whatever
+// liters get added between one full tank and the next — a partial top-up's own liters mean
+// nothing in isolation, they only become meaningful once pooled up to the next full fill —
+// exactly equal what was burned over that same stretch of distance. Walking the fuel-ups in
+// date order, each full-tank fill closes out one window (using everything pooled since the
+// previous full tank, including its own quantity) and opens the next. The very first full tank
+// ever recorded has nothing before it to close, so it only sets the baseline; distance/qty from
+// before it (if any) is intentionally dropped, since there's no anchor to measure it against.
+function fullTankWindows(fuelUps: FuelUpWithTrips[]): FullTankWindow[] {
+  const sorted = [...fuelUps].sort((a, b) => a.occurredAt.getTime() - b.occurredAt.getTime())
+  const windows: FullTankWindow[] = []
+  let pendingQty = 0
+  let pendingDistance = 0
+  let haveAnchor = false
+
+  for (const f of sorted) {
+    pendingQty += Number(f.quantity)
+    pendingDistance += f.trips.reduce((sum, t) => sum + t.distanceKm, 0)
+
+    if (f.isFullTank) {
+      if (haveAnchor && pendingDistance > 0) {
+        windows.push({ date: f.occurredAt, fuelQty: pendingQty, distanceKm: pendingDistance })
+      }
+      pendingQty = 0
+      pendingDistance = 0
+      haveAnchor = true
+    }
+  }
+
+  return windows
+}
+
+// `distanceKm`/`expenseCost`/`fuelQty`/`fuelCost` here are raw totals (all trips driven, all fuel
+// bought, full or partial) — unaffected by the full-to-full method, since "how much did I drive"
+// and "how much did I spend" don't need a full-tank anchor to be meaningful. `avgConsumption` is
+// the one figure that does — it's derived entirely from `windows` (see fullTankWindows above),
+// weighted across every window in the bucket rather than averaging each window's own L/100km,
+// so a long low-consumption window doesn't get equal footing with a short high-consumption one.
+function aggregate(
+  trips: TripLogWithChildren[],
+  fuelUps: FuelUpWithTrips[],
+  windows: FullTankWindow[],
+  itemType: ItemType
+): StatsBucket {
   const distanceKm = trips.reduce((sum, t) => sum + t.distanceKm, 0)
   const fuelQty = fuelUps.reduce((sum, f) => sum + Number(f.quantity), 0)
   const fuelCost = fuelUps.reduce((sum, f) => sum + Number(f.totalPaid), 0)
   const expenseCost = trips.reduce((sum, t) => sum + Number(t.totalExpenseCost), 0)
   const elevationGainM = trips.reduce((sum, t) => sum + (t.elevationGainM ?? 0), 0)
-  const avgConsumption = distanceKm > 0 && fuelQty > 0 ? fuelQty / consumptionDivisor(itemType, distanceKm) : 0
+  const windowQty = windows.reduce((sum, w) => sum + w.fuelQty, 0)
+  const windowDistance = windows.reduce((sum, w) => sum + w.distanceKm, 0)
+  const avgConsumption = windowDistance > 0 ? windowQty / consumptionDivisor(itemType, windowDistance) : 0
   return { distanceKm, fuelQty, fuelCost, expenseCost, avgConsumption, elevationGainM }
 }
 
@@ -85,6 +131,7 @@ export class TripService {
     input: {
       itemId: string
       startedAt: Date
+      endedAt?: Date | null
       description?: string | null
       notes?: string | null
       startOdometer?: number
@@ -113,6 +160,7 @@ export class TripService {
       userId,
       itemId: input.itemId,
       startedAt: input.startedAt,
+      endedAt: input.endedAt,
       description: input.description,
       notes: input.notes,
       startOdometer,
@@ -145,6 +193,7 @@ export class TripService {
     userId: string,
     input: {
       startedAt?: Date
+      endedAt?: Date | null
       description?: string | null
       notes?: string | null
       startOdometer?: number
@@ -207,12 +256,17 @@ export class TripService {
 
     const trips = await this.tripRepo.findAllByItemId(itemId, userId)
     const fuelUps = await this.fuelUpRepo.findAllByItemId(itemId, userId)
+    // Computed once over the complete, unfiltered fuel-up history — a window's boundaries
+    // (which full tank closes it) don't care about an arbitrary bucket cutoff, only about
+    // chronological order. Buckets below just filter which already-computed windows count.
+    const windows = fullTankWindows(fuelUps)
 
-    const allTime = aggregate(trips, fuelUps, item.type)
+    const allTime = aggregate(trips, fuelUps, windows, item.type)
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
     const last30Days = aggregate(
       trips.filter((t) => t.startedAt >= thirtyDaysAgo),
       fuelUps.filter((f) => f.occurredAt >= thirtyDaysAgo),
+      windows.filter((w) => w.date >= thirtyDaysAgo),
       item.type
     )
 
@@ -242,17 +296,13 @@ export class TripService {
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([month, v]) => ({ month, ...v }))
 
-    // One point per FuelUp (not per trip) — consumption = this fuel-up's quantity divided by the
-    // combined distance of every trip it's linked to. A fuel-up with no linked trips yet is
-    // excluded (nothing to divide by); a trip linked to multiple fuel-ups deliberately has its
-    // distance counted toward each of them (an accepted approximation, see PR #15).
-    const consumptionTrend = fuelUps
-      .map((f) => {
-        const linkedDistance = f.trips.reduce((sum, t) => sum + t.distanceKm, 0)
-        if (linkedDistance <= 0) return null
-        return { date: f.occurredAt, consumption: Number(f.quantity) / consumptionDivisor(item.type, linkedDistance) }
-      })
-      .filter((p): p is { date: Date; consumption: number } => p !== null)
+    // One point per full-tank window (see fullTankWindows above) — not per FuelUp anymore. A
+    // partial top-up never gets its own point; it just pools into whichever full-tank window
+    // closes next.
+    const consumptionTrend = windows.map((w) => ({
+      date: w.date,
+      consumption: w.fuelQty / consumptionDivisor(item.type, w.distanceKm),
+    }))
 
     // BICYCLE: derived average speed per ride (needs both distance and a logged duration).
     const speedTrend = trips

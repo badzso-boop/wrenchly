@@ -1,8 +1,10 @@
 import type { PrismaClient, FuelUp } from '@prisma/client'
 
-export type FuelUpWithTrips = FuelUp & { trips: { id: string; startedAt: Date; distanceKm: number }[] }
+export type FuelUpWithTrips = FuelUp & {
+  trips: { id: string; startedAt: Date; distanceKm: number; description: string | null }[]
+}
 
-const TRIP_SELECT = { id: true, startedAt: true, distanceKm: true } as const
+const TRIP_SELECT = { id: true, startedAt: true, distanceKm: true, description: true } as const
 
 export class FuelUpRepository {
   constructor(private db: PrismaClient) {}
@@ -39,7 +41,13 @@ export class FuelUpRepository {
   async listTripsForItem(itemId: string, userId: string) {
     return this.db.tripLog.findMany({
       where: { itemId, userId },
-      select: { id: true, startedAt: true, distanceKm: true, fuelUps: { select: { id: true } } },
+      select: {
+        id: true,
+        startedAt: true,
+        distanceKm: true,
+        description: true,
+        fuelUps: { select: { id: true } },
+      },
       orderBy: { startedAt: 'desc' },
     })
   }
@@ -50,6 +58,7 @@ export class FuelUpRepository {
     occurredAt: Date
     quantity: number
     unit: string
+    isFullTank: boolean
     pricePerUnit: number
     totalPaid: number
     currency: string
@@ -74,6 +83,7 @@ export class FuelUpRepository {
       occurredAt: Date
       quantity: number
       unit: string
+      isFullTank: boolean
       pricePerUnit: number
       totalPaid: number
       currency: string

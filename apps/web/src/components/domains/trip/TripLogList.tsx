@@ -36,6 +36,7 @@ function EditTripLogForm({ trip, itemType, onDone }: { trip: TripWithChildren; i
   const labels = getTripLogLabels(itemType)
   const utils = api.useUtils()
   const [startedAt, setStartedAt] = useState(new Date(trip.startedAt).toISOString().slice(0, 10))
+  const [endedAt, setEndedAt] = useState(trip.endedAt ? new Date(trip.endedAt).toISOString().slice(0, 10) : '')
   const [startOdometer, setStartOdometer] = useState(String(trip.startOdometer))
   const [distanceKm, setDistanceKm] = useState(String(trip.distanceKm))
   const [durationMin, setDurationMin] = useState(trip.durationMin?.toString() ?? '')
@@ -80,6 +81,7 @@ function EditTripLogForm({ trip, itemType, onDone }: { trip: TripWithChildren; i
     updateTrip.mutate({
       id: trip.id,
       startedAt: new Date(startedAt),
+      endedAt: endedAt ? new Date(endedAt) : undefined,
       description: description || undefined,
       notes: notes || undefined,
       startOdometer: labels!.showOdometerFields ? Number(startOdometer) : undefined,
@@ -110,6 +112,10 @@ function EditTripLogForm({ trip, itemType, onDone }: { trip: TripWithChildren; i
         <div className="space-y-1.5">
           <Label htmlFor={`edit-trip-desc-${trip.id}`}>Description</Label>
           <Input id={`edit-trip-desc-${trip.id}`} value={description} onChange={(e) => setDescription((e.target as HTMLInputElement).value)} />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor={`edit-trip-end-date-${trip.id}`}>End date</Label>
+          <DateField id={`edit-trip-end-date-${trip.id}`} value={endedAt} onChange={setEndedAt} />
         </div>
       </div>
 
@@ -257,7 +263,10 @@ export function TripLogList({ trips, itemType, itemId }: { trips: TripWithChildr
                     <span className="font-medium text-sm truncate">{trip.description || 'Trip'}</span>
                   </div>
                   <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                    <span>{new Date(trip.startedAt).toLocaleDateString()}</span>
+                    <span>
+                      {new Date(trip.startedAt).toLocaleDateString()}
+                      {trip.endedAt ? ` – ${new Date(trip.endedAt).toLocaleDateString()}` : ''}
+                    </span>
                     {trip.distanceKm > 0 && <span>{trip.distanceKm.toLocaleString()} {distanceUnit}</span>}
                     {trip.durationMin != null && <span>{trip.durationMin} min</span>}
                     {trip.batteryPercentUsed != null && <span>{trip.batteryPercentUsed}% battery</span>}

@@ -176,15 +176,28 @@ describe('TripService.getStatistics', () => {
     await expect(service.getStatistics('item-1', 'user-1')).rejects.toMatchObject({ code: 'NOT_FOUND' })
   })
 
-  it('computes average consumption as L/100km, fuel sourced from FuelUp not TripLog', async () => {
+  it('computes average consumption as L/100km from a full-to-full window, fuel sourced from FuelUp not TripLog', async () => {
     mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1', type: 'VEHICLE' })
-    const now = new Date()
+    const earlier = new Date('2026-06-01')
+    const now = new Date('2026-07-01')
     mockTripRepo.findAllByItemId.mockResolvedValue([
-      { startedAt: now, distanceKm: 500, totalExpenseCost: 0, expenses: [] },
-      { startedAt: now, distanceKm: 500, totalExpenseCost: 0, expenses: [] },
+      { id: 'trip-1', startedAt: now, distanceKm: 500, totalExpenseCost: 0, expenses: [] },
+      { id: 'trip-2', startedAt: now, distanceKm: 500, totalExpenseCost: 0, expenses: [] },
     ])
     mockFuelUpRepo.findAllByItemId.mockResolvedValue([
-      { occurredAt: now, quantity: 70, totalPaid: 42000, currency: 'HUF', trips: [] },
+      // Anchor: the first full tank ever just sets the baseline, no window closes on it.
+      { occurredAt: earlier, quantity: 45, totalPaid: 27000, currency: 'HUF', isFullTank: true, trips: [] },
+      {
+        occurredAt: now,
+        quantity: 70,
+        totalPaid: 42000,
+        currency: 'HUF',
+        isFullTank: true,
+        trips: [
+          { id: 'trip-1', startedAt: now, distanceKm: 500, description: null },
+          { id: 'trip-2', startedAt: now, distanceKm: 500, description: null },
+        ],
+      },
     ])
 
     const stats = await service.getStatistics('item-1', 'user-1')
@@ -192,8 +205,37 @@ describe('TripService.getStatistics', () => {
     // 70 liters / (1000km / 100) = 7 L/100km
     expect(stats.allTime.avgConsumption).toBeCloseTo(7)
     expect(stats.allTime.distanceKm).toBe(1000)
-    expect(stats.allTime.fuelCost).toBe(42000)
+    expect(stats.allTime.fuelCost).toBe(69000)
     expect(stats.tripCount).toBe(2)
+  })
+
+  it('a partial top-up between two full tanks pools into the closing window instead of getting its own point', async () => {
+    mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1', type: 'VEHICLE' })
+    const anchor = new Date('2026-06-01')
+    const partial = new Date('2026-06-15')
+    const close = new Date('2026-07-01')
+    mockTripRepo.findAllByItemId.mockResolvedValue([])
+    mockFuelUpRepo.findAllByItemId.mockResolvedValue([
+      { occurredAt: anchor, quantity: 45, totalPaid: 27000, currency: 'HUF', isFullTank: true, trips: [] },
+      // Partial top-up mid-window — no linked trips of its own, still counts toward the window.
+      { occurredAt: partial, quantity: 15, totalPaid: 9000, currency: 'HUF', isFullTank: false, trips: [] },
+      {
+        occurredAt: close,
+        quantity: 55,
+        totalPaid: 33000,
+        currency: 'HUF',
+        isFullTank: true,
+        trips: [{ id: 'trip-1', startedAt: partial, distanceKm: 1000, description: null }],
+      },
+    ])
+
+    const stats = await service.getStatistics('item-1', 'user-1')
+
+    // (15 + 55) liters / (1000km / 100) = 7 L/100km — the partial's 15L folded into the window
+    // that the next full tank closes, not treated as its own data point.
+    expect(stats.consumptionTrend).toHaveLength(1)
+    expect(stats.consumptionTrend[0]?.consumption).toBeCloseTo(7)
+    expect(stats.consumptionTrend[0]?.date).toEqual(close)
   })
 
   it('returns 0 average consumption when there is no distance or fuel data', async () => {
@@ -271,12 +313,21 @@ describe('TripService.getStatistics', () => {
 
   it('computes BOAT consumption as L/hour (distanceKm holds engine hours for this type)', async () => {
     mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1', type: 'BOAT' })
-    const now = new Date()
+    const anchor = new Date('2026-06-01')
+    const now = new Date('2026-07-01')
     mockTripRepo.findAllByItemId.mockResolvedValue([
       { id: 'trip-1', startedAt: now, distanceKm: 10, totalExpenseCost: 0, expenses: [] },
     ])
     mockFuelUpRepo.findAllByItemId.mockResolvedValue([
-      { occurredAt: now, quantity: 25, totalPaid: 15000, currency: 'HUF', trips: [{ id: 'trip-1', startedAt: now, distanceKm: 10 }] },
+      { occurredAt: anchor, quantity: 20, totalPaid: 12000, currency: 'HUF', isFullTank: true, trips: [] },
+      {
+        occurredAt: now,
+        quantity: 25,
+        totalPaid: 15000,
+        currency: 'HUF',
+        isFullTank: true,
+        trips: [{ id: 'trip-1', startedAt: now, distanceKm: 10, description: null }],
+      },
     ])
 
     const stats = await service.getStatistics('item-1', 'user-1')
@@ -286,23 +337,26 @@ describe('TripService.getStatistics', () => {
     expect(stats.consumptionTrend[0]?.consumption).toBeCloseTo(2.5)
   })
 
-  it('consumptionTrend: one point per FuelUp, using the combined distance of every trip it covers', async () => {
+  it('consumptionTrend: a full-tank window pools the combined distance of every trip linked across it', async () => {
     mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1', type: 'VEHICLE' })
-    const now = new Date()
+    const anchor = new Date('2026-06-01')
+    const now = new Date('2026-07-01')
     mockTripRepo.findAllByItemId.mockResolvedValue([
       { id: 'trip-1', startedAt: now, distanceKm: 200, totalExpenseCost: 0, expenses: [] },
       { id: 'trip-2', startedAt: now, distanceKm: 300, totalExpenseCost: 0, expenses: [] },
     ])
     // One fuel-up covers BOTH trips (the exact Norbert scenario: drive around, refuel once).
     mockFuelUpRepo.findAllByItemId.mockResolvedValue([
+      { occurredAt: anchor, quantity: 30, totalPaid: 18000, currency: 'HUF', isFullTank: true, trips: [] },
       {
         occurredAt: now,
         quantity: 40,
         totalPaid: 24000,
         currency: 'HUF',
+        isFullTank: true,
         trips: [
-          { id: 'trip-1', startedAt: now, distanceKm: 200 },
-          { id: 'trip-2', startedAt: now, distanceKm: 300 },
+          { id: 'trip-1', startedAt: now, distanceKm: 200, description: null },
+          { id: 'trip-2', startedAt: now, distanceKm: 300, description: null },
         ],
       },
     ])
@@ -314,12 +368,14 @@ describe('TripService.getStatistics', () => {
     expect(stats.consumptionTrend[0]?.consumption).toBeCloseTo(8)
   })
 
-  it('consumptionTrend: excludes a fuel-up with zero linked trips instead of dividing by zero', async () => {
+  it('consumptionTrend: excludes a window with zero linked trips instead of dividing by zero', async () => {
     mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1', type: 'VEHICLE' })
-    const now = new Date()
+    const anchor = new Date('2026-06-01')
+    const now = new Date('2026-07-01')
     mockTripRepo.findAllByItemId.mockResolvedValue([])
     mockFuelUpRepo.findAllByItemId.mockResolvedValue([
-      { occurredAt: now, quantity: 40, totalPaid: 24000, currency: 'HUF', trips: [] },
+      { occurredAt: anchor, quantity: 30, totalPaid: 18000, currency: 'HUF', isFullTank: true, trips: [] },
+      { occurredAt: now, quantity: 40, totalPaid: 24000, currency: 'HUF', isFullTank: true, trips: [] },
     ])
 
     const stats = await service.getStatistics('item-1', 'user-1')
@@ -327,23 +383,23 @@ describe('TripService.getStatistics', () => {
     expect(stats.consumptionTrend).toHaveLength(0)
   })
 
-  it('consumptionTrend: a trip linked to two fuel-ups contributes its distance to each independently (accepted approximation)', async () => {
+  it('consumptionTrend: two consecutive full tanks with a shared trip in between produce ONE window, not one per fuel-up', async () => {
     mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1', type: 'VEHICLE' })
-    const now = new Date()
-    const sharedTrip = { id: 'trip-1', startedAt: now, distanceKm: 100 }
+    const first = new Date('2026-06-01')
+    const second = new Date('2026-07-01')
+    const sharedTrip = { id: 'trip-1', startedAt: second, distanceKm: 100, description: null }
     mockTripRepo.findAllByItemId.mockResolvedValue([{ ...sharedTrip, totalExpenseCost: 0, expenses: [] }])
     mockFuelUpRepo.findAllByItemId.mockResolvedValue([
-      { occurredAt: now, quantity: 5, totalPaid: 3000, currency: 'HUF', trips: [sharedTrip] },
-      { occurredAt: now, quantity: 10, totalPaid: 6000, currency: 'HUF', trips: [sharedTrip] },
+      // First full tank has nothing before it — sets the baseline only, no window yet.
+      { occurredAt: first, quantity: 5, totalPaid: 3000, currency: 'HUF', isFullTank: true, trips: [] },
+      // Second full tank closes the window: this fuel-up's own 10L is what the whole 100km cost.
+      { occurredAt: second, quantity: 10, totalPaid: 6000, currency: 'HUF', isFullTank: true, trips: [sharedTrip] },
     ])
 
     const stats = await service.getStatistics('item-1', 'user-1')
 
-    expect(stats.consumptionTrend).toHaveLength(2)
-    // Each fuel-up's own consumption is still correct in isolation, even though trip-1's 100km
-    // is counted toward both — this is the documented, accepted N-N trade-off (PR #15).
-    expect(stats.consumptionTrend[0]?.consumption).toBeCloseTo(5) // 5L / 1
-    expect(stats.consumptionTrend[1]?.consumption).toBeCloseTo(10) // 10L / 1
+    expect(stats.consumptionTrend).toHaveLength(1)
+    expect(stats.consumptionTrend[0]?.consumption).toBeCloseTo(10) // 10L / 1
   })
 
   it('derives a BICYCLE speed trend from distance+duration, skipping rides with no duration', async () => {

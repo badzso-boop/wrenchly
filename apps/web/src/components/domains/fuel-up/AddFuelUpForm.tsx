@@ -16,6 +16,7 @@ export const CURRENCIES = ['HUF', 'EUR', 'USD', 'GBP', 'CHF']
 
 export function AddFuelUpForm({ itemId, onSuccess }: { itemId: string; onSuccess: () => void }) {
   const [occurredAt, setOccurredAt] = useState(new Date().toISOString().slice(0, 10))
+  const [isFullTank, setIsFullTank] = useState(true)
   const [quantity, setQuantity] = useState('')
   const [pricePerUnit, setPricePerUnit] = useState('')
   const [currency, setCurrency] = useState('HUF')
@@ -39,6 +40,7 @@ export function AddFuelUpForm({ itemId, onSuccess }: { itemId: string; onSuccess
     createFuelUp.mutate({
       itemId,
       occurredAt: new Date(occurredAt),
+      isFullTank,
       quantity: Number(quantity),
       pricePerUnit: Number(pricePerUnit),
       currency,
@@ -75,6 +77,21 @@ export function AddFuelUpForm({ itemId, onSuccess }: { itemId: string; onSuccess
               <Input id="fuelup-price" type="number" value={pricePerUnit} onChange={(e) => setPricePerUnit((e.target as HTMLInputElement).value)} min="0" step="0.01" required />
             </div>
           </div>
+
+          <label className="flex items-start gap-2.5 text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              checked={isFullTank}
+              onChange={(e) => setIsFullTank((e.target as HTMLInputElement).checked)}
+              className="h-4 w-4 mt-0.5 rounded border-input"
+            />
+            <span>
+              Filled the tank all the way up
+              <span className="block text-xs text-muted-foreground">
+                Uncheck for a partial top-up — average consumption is only calculated between full tanks.
+              </span>
+            </span>
+          </label>
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
@@ -124,7 +141,8 @@ export function AddFuelUpForm({ itemId, onSuccess }: { itemId: string; onSuccess
                       className="h-4 w-4 rounded border-input"
                     />
                     <span className="flex-1">
-                      {new Date(trip.startedAt).toLocaleDateString()} — {trip.distanceKm.toLocaleString()} km
+                      {new Date(trip.startedAt).toLocaleDateString()}
+                      {trip.description ? ` — ${trip.description}` : ''} — {trip.distanceKm.toLocaleString()} km
                     </span>
                     {trip.fuelUps.length > 0 && (
                       <span className="text-xs text-muted-foreground">

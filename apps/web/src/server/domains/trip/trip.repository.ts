@@ -39,6 +39,7 @@ export class TripRepository {
     userId: string
     itemId: string
     startedAt: Date
+    endedAt?: Date | null
     description?: string | null
     notes?: string | null
     startOdometer: number
@@ -71,6 +72,7 @@ export class TripRepository {
     id: string,
     data: {
       startedAt?: Date
+      endedAt?: Date | null
       description?: string | null
       notes?: string | null
       startOdometer?: number
