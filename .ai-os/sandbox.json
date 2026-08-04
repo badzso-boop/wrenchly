@@ -1,1 +1,6 @@
-{ "test_command": "true" }
+{
+  "setup_commands": [
+    "pnpm --filter @wrenchly/web db:generate"
+  ],
+  "test_command": "pnpm --filter @wrenchly/web typecheck"
+}
