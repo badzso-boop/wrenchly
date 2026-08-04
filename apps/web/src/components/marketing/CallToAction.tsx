@@ -13,10 +13,8 @@ export function CallToAction() {
           <p className="mb-8 text-lg text-muted-foreground">
             {finalCta.description}
           </p>
-          <Button asChild>
-            <Link href={finalCta.cta.href}>
-              {finalCta.cta.label}
-            </Link>
+          <Button render={<Link href={finalCta.cta.href} />} nativeButton={false}>
+            {finalCta.cta.label}
           </Button>
         </div>
       </div>

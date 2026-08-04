@@ -43,15 +43,11 @@ export function MarketingHeader() {
         {/* Right side actions */}
         <div className="flex items-center gap-2">
           <ThemeToggle />
-          <Button asChild variant="ghost" size="sm">
-            <Link href="/login">
-              Sign in
-            </Link>
+          <Button variant="ghost" size="sm" render={<Link href="/login" />} nativeButton={false}>
+            Sign in
           </Button>
-          <Button asChild variant="default" size="sm">
-            <Link href="/register">
-              Get started
-            </Link>
+          <Button variant="default" size="sm" render={<Link href="/register" />} nativeButton={false}>
+            Get started
           </Button>
         </div>
       </nav>

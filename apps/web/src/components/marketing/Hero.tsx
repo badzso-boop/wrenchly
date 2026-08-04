@@ -22,15 +22,11 @@ export function Hero() {
 
         {/* CTAs */}
         <div className="flex flex-col sm:flex-row gap-3 pt-4">
-          <Button asChild size="lg">
-            <Link href={heroContent.primaryCta.href}>
-              {heroContent.primaryCta.label}
-            </Link>
+          <Button size="lg" render={<Link href={heroContent.primaryCta.href} />} nativeButton={false}>
+            {heroContent.primaryCta.label}
           </Button>
-          <Button asChild variant="outline" size="lg">
-            <Link href={heroContent.secondaryCta.href}>
-              {heroContent.secondaryCta.label}
-            </Link>
+          <Button variant="outline" size="lg" render={<Link href={heroContent.secondaryCta.href} />} nativeButton={false}>
+            {heroContent.secondaryCta.label}
           </Button>
         </div>
       </div>
