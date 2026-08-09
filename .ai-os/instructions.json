@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "project_name": "wrenchly",
+  "display_name": "Wrenchly Maintenance Tracker",
+  "architecture": {
+    "monorepo": true,
+    "package_manager": "pnpm",
+    "main_app": "apps/web",
+    "stack": [
+      "nextjs",
+      "react",
+      "trpc",
+      "prisma",
+      "better-auth",
+      "tailwind",
+      "vitest",
+      "playwright"
+    ]
+  },
+  "commands": {
+    "setup": [
+      "pnpm --filter @wrenchly/web db:generate"
+    ],
+    "typecheck": "pnpm --filter @wrenchly/web typecheck",
+    "test_unit": "pnpm --filter @wrenchly/web test:unit",
+    "test_e2e": "pnpm --filter @wrenchly/web test:e2e:mock",
+    "db_generate": "pnpm --filter @wrenchly/web db:generate",
+    "db_migrate": "pnpm --filter @wrenchly/web db:migrate"
+  },
+  "docs": [
+    "CLAUDE.md",
+    "README.md",
+    "wrenchly-architecture.md",
+    "wrenchly-schema.md",
+    "wrenchly-financial-plan.md",
+    "wrenchly-marketing-plan.md",
+    "wrenchly-home-expenses-cooking-plan.md"
+  ],
+  "conventions": ".ai-os/conventions.md",
+  "sandbox": ".ai-os/sandbox.json",
+  "ui_config": ".ai-os/ui.json"
+}
