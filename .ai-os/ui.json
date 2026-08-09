@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "project": "wrenchly",
+  "dev_command": "pnpm --filter @wrenchly/web dev",
+  "dev_url": "http://localhost:3000",
+  "live_url": "https://wrenchly.ujjweb.hu",
+  "viewport": {
+    "width": 375,
+    "height": 667,
+    "device_scale_factor": 2,
+    "is_mobile": true
+  },
+  "flows": [
+    {
+      "name": "login",
+      "path": "/login",
+      "description": "User login flow with Better Auth"
+    },
+    {
+      "name": "item_detail",
+      "path": "/items",
+      "description": "Item details and maintenance tabs (375px overflow check)"
+    },
+    {
+      "name": "trip_log",
+      "path": "/trips",
+      "description": "Vehicle trip log and odometer recording"
+    },
+    {
+      "name": "readings",
+      "path": "/readings",
+      "description": "Cross-domain readings (Pet, Vehicle, Utilities)"
+    }
+  ]
+}
