@@ -45,6 +45,8 @@ This document provides project-specific rules, architectural patterns, and valid
 
 - **Unit Testing Framework**: Use `vitest` with native node/element structure checks or standard exported prop unit testing for React components under `apps/web/__tests__/unit/`.
 - **Do Not Generate Unused JSDOM / React Testing Library Tests**: Do NOT generate unit tests importing `@testing-library/react` or `@testing-library/jest-dom` unless JSDOM setup and matchers are configured in `vitest.config.ts`.
+- **Root Page Auth Redirect Convention**: When modifying root route files (`apps/web/src/app/page.tsx`), always preserve the authentication/session redirect check via `getServerSession()`. Authenticated requests must redirect to `/dashboard` so E2E navigation tests remain unbroken, while unauthenticated users see the marketing landing page.
 - **Strict Verification Before Staging**: Task execution must run `npm --prefix apps/web run typecheck` and `npm --prefix apps/web run test:unit` inside the agent's task environment before declaring success.
 - **Git Staging Cleanliness**: Never leave dirty / unstaged modified files in the working directory before running `git merge --ff-only` or completing task staging.
+
 
