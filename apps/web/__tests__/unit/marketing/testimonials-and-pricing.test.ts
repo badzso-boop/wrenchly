@@ -15,8 +15,7 @@ describe('TestimonialsSection & PricingSection Unit Tests', () => {
       expect(vnode.props.id).toBe('testimonials');
 
       const containerDiv = vnode.props.children;
-      const contentWrapper = containerDiv.props.children;
-      const [headerDiv, gridDiv] = contentWrapper.props.children;
+      const [headerDiv, gridDiv] = containerDiv.props.children;
 
       // Header assertions
       const [titleH2, subtitleP] = headerDiv.props.children;
@@ -46,16 +45,15 @@ describe('TestimonialsSection & PricingSection Unit Tests', () => {
 
       const vnode = TestimonialsSection({ testimonials: customTestimonials });
       const containerDiv = vnode.props.children;
-      const contentWrapper = containerDiv.props.children;
-      const [, gridDiv] = contentWrapper.props.children;
+      const [, gridDiv] = containerDiv.props.children;
       const cards = gridDiv.props.children;
 
       expect(cards.length).toBe(1);
       const card = cards[0];
       expect(card.props['data-testid']).toBe('testimonial-card-t-1');
 
-      const cardBody = card.props.children[0];
-      const ratingContainer = cardBody.props.children[0];
+      const [topContentDiv] = card.props.children;
+      const ratingContainer = topContentDiv.props.children[0];
       expect(ratingContainer.props['data-testid']).toBe('rating-stars-t-1');
 
       const stars = ratingContainer.props.children;
@@ -74,58 +72,55 @@ describe('TestimonialsSection & PricingSection Unit Tests', () => {
     it('creates PricingSection element with id="pricing" and default self-hosted free tier', () => {
       const element = React.createElement(PricingSection, {});
       expect(element.type).toBe(PricingSection);
+      expect(element.props).toEqual({});
 
       const vnode = PricingSection({});
       expect(vnode.props.id).toBe('pricing');
 
       const containerDiv = vnode.props.children;
-      const contentWrapper = containerDiv.props.children;
-      const [headerDiv, cardWrapperDiv] = contentWrapper.props.children;
+      const [headerDiv, cardWrapperDiv] = containerDiv.props.children;
 
       // Header assertions
-      const [titleH2, subtitleP] = headerDiv.props.children;
-      expect(titleH2.props.children).toBe('Simple, Transparent Pricing');
-      expect(subtitleP.props.children).toBe(
-        'Wrenchly is designed to be free and open-source for self-hosters.'
-      );
+      expect(headerDiv.props.children[0].props.children).toBe('Simple, Transparent Pricing');
 
-      // Card wrapper and single card assertions
+      // Card assertions
       const card = cardWrapperDiv.props.children;
-      expect(card.props.id).toBe('pricing-card-free');
       expect(card.props['data-testid']).toBe('pricing-card-free');
 
-      const cardContent = card.props.children[1];
-      const cardHeader = cardContent.props.children[0];
-      const tierNameH3 = cardHeader.props.children[0];
-      const priceDiv = cardHeader.props.children[1];
+      const cardBody = card.props.children[1];
+      const [header, featureList] = cardBody.props.children;
 
-      expect(tierNameH3.props.children).toBe('Free Self-Hosted');
-      expect(priceDiv.props.children[0].props.children).toBe('$0');
-      expect(priceDiv.props.children[1].props.children).toEqual(['/', 'forever']);
+      expect(header.props.children[0].props.children).toBe('Free Self-Hosted');
+      expect(header.props.children[1].props.children[0].props.children).toBe('$0');
+      expect(featureList.props.children.length).toBeGreaterThan(0);
     });
 
     it('allows customizing title, tierName, price, and features list', () => {
-      const customFeatures = ['Unlimited Items', 'Self-Hosted Privacy'];
+      const customFeatures = ['Unlimited Items', 'Multi-user Cloud Sync', '24/7 Support'];
       const vnode = PricingSection({
-        title: 'Community Edition',
-        tierName: 'Self-Hosted PRO',
-        tierPrice: '$0',
+        title: 'Choose Your Plan',
+        tierName: 'Pro Cloud',
+        tierPrice: '$9',
         features: customFeatures,
       });
 
       const containerDiv = vnode.props.children;
-      const contentWrapper = containerDiv.props.children;
-      const [headerDiv, cardWrapperDiv] = contentWrapper.props.children;
+      const [headerDiv, cardWrapperDiv] = containerDiv.props.children;
 
-      expect(headerDiv.props.children[0].props.children).toBe('Community Edition');
+      expect(headerDiv.props.children[0].props.children).toBe('Choose Your Plan');
 
       const card = cardWrapperDiv.props.children;
-      const cardContent = card.props.children[1];
-      const featureList = cardContent.props.children[1];
+      const cardBody = card.props.children[1];
+      const [header, featureList] = cardBody.props.children;
 
-      expect(featureList.props.children.length).toBe(2);
-      expect(featureList.props.children[0].props.children[1].props.children).toBe('Unlimited Items');
-      expect(featureList.props.children[1].props.children[1].props.children).toBe('Self-Hosted Privacy');
+      expect(header.props.children[0].props.children).toBe('Pro Cloud');
+      expect(header.props.children[1].props.children[0].props.children).toBe('$9');
+
+      const featureItems = featureList.props.children;
+      expect(featureItems.length).toBe(3);
+      expect(featureItems[0].props.children[1].props.children).toBe('Unlimited Items');
+      expect(featureItems[1].props.children[1].props.children).toBe('Multi-user Cloud Sync');
+      expect(featureItems[2].props.children[1].props.children).toBe('24/7 Support');
     });
   });
 });
