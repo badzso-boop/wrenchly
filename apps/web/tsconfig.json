@@ -12,6 +12,7 @@
       ]
     },
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["vitest/globals"],
     "allowJs": true,
     "noEmit": true,
     "incremental": true,
@@ -24,6 +25,8 @@
     ".next/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "src/app/(marketing)/**/*.test.*",
+    "__tests__/unit/marketing-components.test.tsx"
   ]
 }

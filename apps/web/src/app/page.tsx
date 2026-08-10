@@ -1,12 +1,13 @@
-import { redirect } from 'next/navigation'
-import { getServerSession } from '@/lib/auth/server'
+import { redirect } from 'next/navigation';
+import { getServerSession } from '@/lib/auth/server';
+import MarketingPage, { metadata } from './(marketing)/page';
+
+export { metadata };
 
 export default async function HomePage() {
-  const session = await getServerSession()
-
+  const session = await getServerSession().catch(() => null);
   if (session) {
-    redirect('/dashboard')
-  } else {
-    redirect('/login')
+    redirect('/dashboard');
   }
+  return <MarketingPage />;
 }

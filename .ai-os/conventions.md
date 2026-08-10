@@ -38,3 +38,16 @@ This document provides project-specific rules, architectural patterns, and valid
   pnpm --filter @wrenchly/web test:unit
   ```
 - **E2E Testing**: E2E tests are configured via Playwright (`pnpm --filter @wrenchly/web test:e2e:mock`).
+
+---
+
+## 5. AI Agent Testing & Git Execution Rules
+
+- **Unit Testing Framework**: Use `vitest` with native node/element structure checks or standard exported prop unit testing for React components under `apps/web/__tests__/unit/`.
+- **Do Not Generate Unused JSDOM / React Testing Library Tests**: Do NOT generate unit tests importing `@testing-library/react` or `@testing-library/jest-dom` unless JSDOM setup and matchers are configured in `vitest.config.ts`.
+- **Root Page Auth Redirect Convention**: When modifying root route files (`apps/web/src/app/page.tsx`), always preserve the authentication/session redirect check via `getServerSession()`. Authenticated requests must redirect to `/dashboard` so E2E navigation tests remain unbroken, while unauthenticated users see the marketing landing page.
+- **Strict Verification Before Staging**: Standard tasks must run typecheck and unit tests (`pnpm --filter @wrenchly/web typecheck && pnpm --filter @wrenchly/web test:unit`). For **HIGH** and **CRITICAL** risk tasks (e.g. routing, layout shells, navigation, global auth), the agent MUST also run `pnpm --filter @wrenchly/web test:e2e:mock` in its terminal execution loop to verify Playwright E2E mock navigation and layout flows before marking the task complete.
+- **Git Staging Cleanliness**: Never leave dirty / unstaged modified files in the working directory before running `git merge --ff-only` or completing task staging.
+
+
+
