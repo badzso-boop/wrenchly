@@ -37,4 +37,4 @@ This document provides project-specific rules, architectural patterns, and valid
   pnpm --filter @wrenchly/web typecheck
   pnpm --filter @wrenchly/web test:unit
   ```
-- **E2E Testing**: E2E tests are configured via Playwright (`pnpm --filter @wrenchly/web test:e2e:mock`).
+- **E2E Testing**: E2E tests are configured via Playwright (`pnpm --filter @wrenchly/web test:e2e:mock`). The sandbox's `.ai-os/sandbox.json` `"image"` is pinned to `mcr.microsoft.com/playwright:v<version>-noble`, matching `@playwright/test`'s exact resolved version in `apps/web/package.json`/`pnpm-lock.yaml` — the browsers are baked into that image (no network needed at test time). **If you bump `@playwright/test`, bump the `sandbox.json` image tag to the same version in the same change**, otherwise `test:e2e:mock` fails inside the sandbox with a browser-version mismatch or a missing-executable error.
