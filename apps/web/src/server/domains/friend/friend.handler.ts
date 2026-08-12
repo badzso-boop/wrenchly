@@ -32,7 +32,21 @@ export const friendRouter = createTRPCRouter({
       addresseeId = user.id
     }
 
-    return service.sendRequest(ctx.userId, addresseeId)
+    const result = await service.sendRequest(ctx.userId, addresseeId)
+
+    const requester = await ctx.db.user.findUnique({ where: { id: ctx.userId }, select: { name: true } })
+    await ctx.db.smartNotification.create({
+      data: {
+        userId: addresseeId,
+        channel: 'in_app',
+        titleKey: 'notifications.friend_request_received.title',
+        bodyKey: 'notifications.friend_request_received.body',
+        bodyParams: { name: requester?.name ?? 'Someone' },
+        actionUrl: '/friends',
+      },
+    })
+
+    return result
   }),
 
   accept: protectedProcedure.input(z.object({ requestId: z.string() })).mutation(({ ctx, input }) => {

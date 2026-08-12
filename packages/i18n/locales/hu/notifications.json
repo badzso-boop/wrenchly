@@ -24,6 +24,14 @@
       "title": "Heti karbantartási összefoglaló",
       "intro": "Ezek jönnek a héten:",
       "body": "{{count}} karbantartás esedékes a héten"
+    },
+    "friend_request_received": {
+      "title": "Új baráti kérés",
+      "body": "{{name}} baráti kérést küldött neked"
+    },
+    "item_collaboration_invite": {
+      "title": "Együttműködési meghívás",
+      "body": "{{name}} meghívott, hogy működj együtt ezen: {{itemName}}"
     }
   }
 }

@@ -11,9 +11,26 @@ export const itemCollaboratorRouter = createTRPCRouter({
 
   invite: protectedProcedure
     .input(z.object({ itemId: z.string(), targetUserId: z.string() }))
-    .mutation(({ ctx, input }) => {
+    .mutation(async ({ ctx, input }) => {
       const service = new ItemCollaboratorService(ctx.db, new ItemCollaboratorRepository(ctx.db))
-      return service.inviteCollaborator(input.itemId, ctx.userId, input.targetUserId)
+      const result = await service.inviteCollaborator(input.itemId, ctx.userId, input.targetUserId)
+
+      const [inviter, item] = await Promise.all([
+        ctx.db.user.findUnique({ where: { id: ctx.userId }, select: { name: true } }),
+        ctx.db.item.findUnique({ where: { id: input.itemId }, select: { name: true } }),
+      ])
+      await ctx.db.smartNotification.create({
+        data: {
+          userId: input.targetUserId,
+          channel: 'in_app',
+          titleKey: 'notifications.item_collaboration_invite.title',
+          bodyKey: 'notifications.item_collaboration_invite.body',
+          bodyParams: { name: inviter?.name ?? 'Someone', itemName: item?.name ?? 'an item' },
+          actionUrl: `/items/${input.itemId}`,
+        },
+      })
+
+      return result
     }),
 
   acceptInvite: protectedProcedure.input(z.object({ id: z.string() })).mutation(({ ctx, input }) => {
