@@ -1,8 +1,13 @@
 import { z } from 'zod'
 import { randomBytes } from 'crypto'
 import { TRPCError } from '@trpc/server'
+import { Prisma } from '@prisma/client'
 import { createTRPCRouter, protectedProcedure } from '@/server/trpc'
 import { UserRepository } from './user.repository'
+
+// Lowercase letters/digits/underscore only, 3-20 chars - simple, URL/@-mention
+// friendly, and matches what friend.repository.ts's search already assumes.
+const USERNAME_REGEX = /^[a-z0-9_]{3,20}$/
 
 function generateCalendarToken(): string {
   return randomBytes(32).toString('hex')
@@ -30,6 +35,27 @@ export const userRouter = createTRPCRouter({
     .mutation(({ ctx, input }) => {
       const repo = new UserRepository(ctx.db)
       return repo.update(ctx.userId, input)
+    }),
+
+  updateUsername: protectedProcedure
+    .input(
+      z.object({
+        username: z
+          .string()
+          .toLowerCase()
+          .regex(USERNAME_REGEX, '3-20 characters: lowercase letters, numbers, underscore only'),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const repo = new UserRepository(ctx.db)
+      try {
+        return await repo.updateUsername(ctx.userId, input.username)
+      } catch (err) {
+        if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+          throw new TRPCError({ code: 'CONFLICT', message: 'That username is already taken' })
+        }
+        throw err
+      }
     }),
 
   getNotifPref: protectedProcedure.query(({ ctx }) => {

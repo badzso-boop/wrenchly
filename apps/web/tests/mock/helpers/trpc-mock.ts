@@ -37,8 +37,9 @@ const DEFAULT_HANDLERS: Record<string, Handler> = {
   'notification.markRead': () => TEST_NOTIFICATIONS[0],
   'notification.markAllRead': () => null,
 
-  'user.getMe': () => ({ id: 'mock-user', email: 'e2e@wrenchly.test', name: 'E2E User', locale: 'en', timezone: 'Europe/Budapest', createdAt: '2024-01-01T00:00:00.000Z' }),
+  'user.getMe': () => ({ id: 'mock-user', email: 'e2e@wrenchly.test', name: 'E2E User', username: null, locale: 'en', timezone: 'Europe/Budapest', createdAt: '2024-01-01T00:00:00.000Z' }),
   'user.update': (input) => ({ id: 'mock-user', email: 'e2e@wrenchly.test', ...(input as object) }),
+  'user.updateUsername': (input) => ({ id: 'mock-user', email: 'e2e@wrenchly.test', ...(input as object) }),
   'user.getNotifPref': () => ({ pushEnabled: true, emailEnabled: false, advanceDays: 3, quietHoursFrom: null, quietHoursTo: null, weeklyDigest: false }),
   'user.upsertNotifPref': (input) => input,
   'user.getOrCreateCalendarToken': () => TEST_CALENDAR_TOKEN,
