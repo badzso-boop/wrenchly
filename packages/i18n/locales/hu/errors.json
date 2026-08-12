@@ -38,6 +38,12 @@
       "not_friends": "Nem vagytok barátok ezzel a felhasználóval.",
       "user_not_found": "Nincs ilyen felhasználónevű felhasználó."
     },
+    "household_finance": {
+      "not_home_item": "Ez csak ingatlan/otthon elemekhez érhető el.",
+      "invalid_category": "Érvénytelen kategória ehhez a tranzakció-típushoz.",
+      "invalid_paid_by": "A kiválasztott személynek az elem tulajdonosának vagy elfogadott együttműködőnek kell lennie.",
+      "not_found": "A tranzakció nem található."
+    },
     "item_collaborator": {
       "already_owner": "Ez a felhasználó már tulajdonosa az elemnek.",
       "not_a_friend": "Csak elfogadott barátokat hívhatsz meg együttműködésre.",

@@ -9,6 +9,11 @@ export const itemCollaboratorRouter = createTRPCRouter({
     return service.listForItem(input.itemId, ctx.userId)
   }),
 
+  listPayers: protectedProcedure.input(z.object({ itemId: z.string() })).query(({ ctx, input }) => {
+    const service = new ItemCollaboratorService(ctx.db, new ItemCollaboratorRepository(ctx.db))
+    return service.listPayers(input.itemId, ctx.userId)
+  }),
+
   invite: protectedProcedure
     .input(z.object({ itemId: z.string(), targetUserId: z.string() }))
     .mutation(async ({ ctx, input }) => {

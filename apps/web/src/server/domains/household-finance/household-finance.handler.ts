@@ -8,7 +8,7 @@ import { ItemRepository } from '@/server/domains/item/item.repository'
 function buildService(db: PrismaClient) {
   const repo = new HouseholdFinanceRepository(db)
   const itemRepo = new ItemRepository(db)
-  return new HouseholdFinanceService(repo, itemRepo)
+  return new HouseholdFinanceService(db, repo, itemRepo)
 }
 
 const TransactionTypeSchema = z.enum(['EXPENSE', 'INCOME'])
@@ -35,7 +35,7 @@ export const householdFinanceRouter = createTRPCRouter({
         amount: z.number().positive(),
         currency: z.string().min(1).max(10).default('HUF'),
         category: z.string().max(50).optional(),
-        paidBy: z.string().min(1).max(100),
+        paidByUserId: z.string().min(1),
         store: z.string().max(200).optional(),
         description: z.string().max(500).optional(),
         occurredAt: z.coerce.date(),
@@ -54,7 +54,7 @@ export const householdFinanceRouter = createTRPCRouter({
         amount: z.number().positive().optional(),
         currency: z.string().min(1).max(10).optional(),
         category: z.string().max(50).nullable().optional(),
-        paidBy: z.string().min(1).max(100).optional(),
+        paidByUserId: z.string().min(1).optional(),
         store: z.string().max(200).nullable().optional(),
         description: z.string().max(500).nullable().optional(),
         occurredAt: z.coerce.date().optional(),

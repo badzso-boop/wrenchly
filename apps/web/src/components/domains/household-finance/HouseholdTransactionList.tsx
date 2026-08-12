@@ -13,7 +13,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { getCategoriesFor } from '@/server/domains/household-finance/household-finance.categories'
-import { CURRENCIES, PAID_BY_OPTIONS } from './AddHouseholdTransactionForm'
+import { CURRENCIES } from './AddHouseholdTransactionForm'
 import type { HouseholdTransaction } from '@prisma/client'
 
 function categoryLabel(type: 'EXPENSE' | 'INCOME', category: string | null): string | null {
@@ -21,16 +21,24 @@ function categoryLabel(type: 'EXPENSE' | 'INCOME', category: string | null): str
   return getCategoriesFor(type).find((c) => c.value === category)?.label ?? category
 }
 
-function EditHouseholdTransactionForm({ tx, onDone }: { tx: HouseholdTransaction; onDone: () => void }) {
+function EditHouseholdTransactionForm({
+  tx,
+  onDone,
+}: {
+  tx: HouseholdTransaction & { paidByUser: { id: string; name: string } | null }
+  onDone: () => void
+}) {
   const utils = api.useUtils()
   const [type, setType] = useState<'EXPENSE' | 'INCOME'>(tx.type)
   const [occurredAt, setOccurredAt] = useState(new Date(tx.occurredAt).toISOString().slice(0, 10))
   const [amount, setAmount] = useState(String(tx.amount))
   const [currency, setCurrency] = useState(tx.currency)
   const [category, setCategory] = useState(tx.category ?? '')
-  const [paidBy, setPaidBy] = useState(tx.paidBy ?? '')
+  const [paidByUserId, setPaidByUserId] = useState(tx.paidByUserId ?? tx.paidByUser?.id ?? '')
   const [store, setStore] = useState(tx.store ?? '')
   const [description, setDescription] = useState(tx.description ?? '')
+
+  const payers = api.itemCollaborator.listPayers.useQuery({ itemId: tx.itemId })
 
   const update = api.householdFinance.update.useMutation({
     onSuccess: () => {
@@ -56,7 +64,7 @@ function EditHouseholdTransactionForm({ tx, onDone }: { tx: HouseholdTransaction
       amount: Number(amount),
       currency,
       category: category || null,
-      paidBy,
+      paidByUserId,
       store: type === 'EXPENSE' ? store || null : null,
       description: description || null,
       occurredAt: new Date(occurredAt),
@@ -95,11 +103,10 @@ function EditHouseholdTransactionForm({ tx, onDone }: { tx: HouseholdTransaction
         </div>
         <div className="space-y-1.5">
           <Label htmlFor={`edit-hf-paidby-${tx.id}`}>Who</Label>
-          <Select value={paidBy} onValueChange={(v) => { if (v !== null) setPaidBy(v) }}>
-            <SelectTrigger id={`edit-hf-paidby-${tx.id}`}><SelectValue /></SelectTrigger>
+          <Select value={paidByUserId} onValueChange={(v) => { if (v !== null) setPaidByUserId(v) }}>
+            <SelectTrigger id={`edit-hf-paidby-${tx.id}`}><SelectValue placeholder="Select…" /></SelectTrigger>
             <SelectContent>
-              {PAID_BY_OPTIONS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-              {!PAID_BY_OPTIONS.includes(paidBy) && <SelectItem value={paidBy}>{paidBy}</SelectItem>}
+              {(payers.data ?? []).map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
@@ -146,7 +153,11 @@ function EditHouseholdTransactionForm({ tx, onDone }: { tx: HouseholdTransaction
   )
 }
 
-export function HouseholdTransactionList({ transactions }: { transactions: HouseholdTransaction[] }) {
+export function HouseholdTransactionList({
+  transactions,
+}: {
+  transactions: (HouseholdTransaction & { paidByUser: { id: string; name: string } | null })[]
+}) {
   const utils = api.useUtils()
   const [expanded, setExpanded] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -197,7 +208,7 @@ export function HouseholdTransactionList({ transactions }: { transactions: House
                   </div>
                   <div className="flex items-center gap-3 text-xs text-muted-foreground">
                     <span>{new Date(tx.occurredAt).toLocaleDateString()}</span>
-                    <span>{tx.paidBy}</span>
+                    <span>{tx.paidByUser?.name ?? tx.paidBy}</span>
                     {tx.store && <span>{tx.store}</span>}
                   </div>
                 </div>

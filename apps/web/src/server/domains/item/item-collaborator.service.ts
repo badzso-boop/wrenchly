@@ -92,4 +92,22 @@ export class ItemCollaboratorService {
     if (!access) throw new TRPCError({ code: 'FORBIDDEN', message: 'errors.item.no_access' })
     return this.repo.listForItem(itemId)
   }
+
+  /** Everyone eligible to be attributed as "who paid/earned" on this item: the
+   * owner plus every ACCEPTED collaborator — used by household-finance's
+   * paidByUserId picker. */
+  async listPayers(itemId: string, requestingUserId: string): Promise<{ id: string; name: string }[]> {
+    const access = await resolveItemAccess(this.db, itemId, requestingUserId)
+    if (!access) throw new TRPCError({ code: 'FORBIDDEN', message: 'errors.item.no_access' })
+
+    const [owner, collaborators] = await Promise.all([
+      this.db.user.findUniqueOrThrow({ where: { id: access.item.userId }, select: { id: true, name: true } }),
+      this.repo.listForItem(itemId),
+    ])
+    const accepted = collaborators
+      .filter((c) => c.status === ItemCollaboratorStatus.ACCEPTED)
+      .map((c) => ({ id: c.user.id, name: c.user.name }))
+
+    return [owner, ...accepted]
+  }
 }

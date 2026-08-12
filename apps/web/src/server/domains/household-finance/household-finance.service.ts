@@ -1,9 +1,15 @@
 import { TRPCError } from '@trpc/server'
 import { format } from 'date-fns'
-import type { HouseholdTransaction, HouseholdTransactionType } from '@prisma/client'
-import { type HouseholdFinanceRepository, type HouseholdFinanceListFilters } from './household-finance.repository'
+import type { HouseholdTransactionType } from '@prisma/client'
+import {
+  type HouseholdFinanceRepository,
+  type HouseholdFinanceListFilters,
+  type HouseholdTransactionWithPaidByUser,
+} from './household-finance.repository'
 import { type ItemRepository } from '@/server/domains/item/item.repository'
+import { resolveItemAccess } from '@/server/domains/item/item-access.service'
 import { isValidCategory } from './household-finance.categories'
+import type { PrismaClient } from '@prisma/client'
 
 interface TransactionCreateInput {
   itemId: string
@@ -11,7 +17,7 @@ interface TransactionCreateInput {
   amount: number
   currency?: string
   category?: string | null
-  paidBy: string
+  paidByUserId: string
   store?: string | null
   description?: string | null
   occurredAt: Date
@@ -22,17 +28,17 @@ interface TransactionUpdateInput {
   amount?: number
   currency?: string
   category?: string | null
-  paidBy?: string
+  paidByUserId?: string
   store?: string | null
   description?: string | null
   occurredAt?: Date
 }
 
-function sum(list: HouseholdTransaction[]): number {
+function sum(list: HouseholdTransactionWithPaidByUser[]): number {
   return list.reduce((s, t) => s + Number(t.amount), 0)
 }
 
-function breakdownBy(list: HouseholdTransaction[], key: (t: HouseholdTransaction) => string) {
+function breakdownBy(list: HouseholdTransactionWithPaidByUser[], key: (t: HouseholdTransactionWithPaidByUser) => string) {
   const map = new Map<string, number>()
   for (const t of list) {
     const k = key(t)
@@ -43,11 +49,12 @@ function breakdownBy(list: HouseholdTransaction[], key: (t: HouseholdTransaction
 
 export class HouseholdFinanceService {
   constructor(
+    private db: PrismaClient,
     private repo: HouseholdFinanceRepository,
     private itemRepo: ItemRepository
   ) {}
 
-  async create(userId: string, input: TransactionCreateInput): Promise<HouseholdTransaction> {
+  async create(userId: string, input: TransactionCreateInput) {
     const item = await this.itemRepo.findByIdAndUserId(input.itemId, userId)
     if (!item) throw new TRPCError({ code: 'NOT_FOUND', message: 'errors.item.not_found' })
     if (item.type !== 'HOME') {
@@ -55,6 +62,13 @@ export class HouseholdFinanceService {
     }
     if (input.category && !isValidCategory(input.type, input.category)) {
       throw new TRPCError({ code: 'BAD_REQUEST', message: 'errors.household_finance.invalid_category' })
+    }
+    // paidByUserId must be the item's owner or an ACCEPTED collaborator —
+    // same authorization gate the read/update paths use, not the free-text
+    // "type anyone's name" the old paidBy field allowed.
+    const paidByAccess = await resolveItemAccess(this.db, input.itemId, input.paidByUserId)
+    if (!paidByAccess) {
+      throw new TRPCError({ code: 'BAD_REQUEST', message: 'errors.household_finance.invalid_paid_by' })
     }
 
     return this.repo.create({
@@ -64,14 +78,14 @@ export class HouseholdFinanceService {
       amount: input.amount,
       currency: input.currency ?? 'HUF',
       category: input.category ?? null,
-      paidBy: input.paidBy,
+      paidByUserId: input.paidByUserId,
       store: input.store ?? null,
       description: input.description ?? null,
       occurredAt: input.occurredAt,
     })
   }
 
-  async update(id: string, userId: string, input: TransactionUpdateInput): Promise<HouseholdTransaction> {
+  async update(id: string, userId: string, input: TransactionUpdateInput) {
     const existing = await this.repo.findByIdAndUserId(id, userId)
     if (!existing) throw new TRPCError({ code: 'NOT_FOUND', message: 'errors.household_finance.not_found' })
 
@@ -79,6 +93,12 @@ export class HouseholdFinanceService {
     const effectiveCategory = input.category !== undefined ? input.category : existing.category
     if (effectiveCategory && !isValidCategory(effectiveType, effectiveCategory)) {
       throw new TRPCError({ code: 'BAD_REQUEST', message: 'errors.household_finance.invalid_category' })
+    }
+    if (input.paidByUserId) {
+      const paidByAccess = await resolveItemAccess(this.db, existing.itemId, input.paidByUserId)
+      if (!paidByAccess) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'errors.household_finance.invalid_paid_by' })
+      }
     }
 
     return this.repo.update(id, input)
@@ -94,7 +114,7 @@ export class HouseholdFinanceService {
     itemId: string,
     userId: string,
     filters?: HouseholdFinanceListFilters
-  ): Promise<HouseholdTransaction[]> {
+  ): Promise<HouseholdTransactionWithPaidByUser[]> {
     return this.repo.listByItemId(itemId, userId, filters)
   }
 
@@ -134,12 +154,14 @@ export class HouseholdFinanceService {
       amount: b.amount,
     }))
 
-    // `paidBy` is now a legacy display-only fallback (superseded by paidByUserId,
-    // see item-collaborator domain) - every row is backfilled so this is
-    // realistically never null in practice, but the type went optional with
-    // the migration. Real paidByUserId-based attribution is a later step.
-    const expenseByPaidBy = breakdownBy(expenses, (t) => t.paidBy ?? 'Unknown').map((b) => ({ paidBy: b.key, amount: b.amount }))
-    const incomeByPaidBy = breakdownBy(incomes, (t) => t.paidBy ?? 'Unknown').map((b) => ({ paidBy: b.key, amount: b.amount }))
+    // Real user attribution via paidByUserId (paidBy, the old free-text field, is a
+    // legacy display-only fallback now — see the HouseholdTransaction.paidByUserId
+    // migration and item-collaborator domain). Grouped by the resolved name so
+    // multiple rows for the same person merge correctly regardless of which raw
+    // paidByUserId string was stored.
+    const nameFor = (t: HouseholdTransactionWithPaidByUser) => t.paidByUser?.name ?? t.paidBy ?? 'Unknown'
+    const expenseByPaidBy = breakdownBy(expenses, nameFor).map((b) => ({ paidBy: b.key, amount: b.amount }))
+    const incomeByPaidBy = breakdownBy(incomes, nameFor).map((b) => ({ paidBy: b.key, amount: b.amount }))
 
     // Net balance per person: how much they've put into the shared pool (INCOME) minus how
     // much of the household's spending is attributed to them (EXPENSE) — positive means

@@ -6,6 +6,10 @@ export interface HouseholdFinanceListFilters {
   type?: HouseholdTransactionType
 }
 
+export type HouseholdTransactionWithPaidByUser = HouseholdTransaction & {
+  paidByUser: { id: string; name: string } | null
+}
+
 export class HouseholdFinanceRepository {
   constructor(private db: PrismaClient) {}
 
@@ -23,7 +27,7 @@ export class HouseholdFinanceRepository {
     itemId: string,
     userId: string,
     filters?: HouseholdFinanceListFilters
-  ): Promise<HouseholdTransaction[]> {
+  ): Promise<HouseholdTransactionWithPaidByUser[]> {
     const access = await resolveItemAccess(this.db, itemId, userId)
     if (!access) return []
     const where: Prisma.HouseholdTransactionWhereInput = { itemId }
@@ -34,16 +38,21 @@ export class HouseholdFinanceRepository {
       const month = Number(parts[1])
       where.occurredAt = { gte: new Date(year, month - 1, 1), lt: new Date(year, month, 1) }
     }
-    return this.db.householdTransaction.findMany({ where, orderBy: { occurredAt: 'desc' } })
+    return this.db.householdTransaction.findMany({
+      where,
+      orderBy: { occurredAt: 'desc' },
+      include: { paidByUser: { select: { id: true, name: true } } },
+    })
   }
 
   // Statistics need the full, unfiltered set for the item to compute all-time/monthly buckets.
-  async findAllByItemId(itemId: string, userId: string): Promise<HouseholdTransaction[]> {
+  async findAllByItemId(itemId: string, userId: string): Promise<HouseholdTransactionWithPaidByUser[]> {
     const access = await resolveItemAccess(this.db, itemId, userId)
     if (!access) return []
     return this.db.householdTransaction.findMany({
       where: { itemId },
       orderBy: { occurredAt: 'asc' },
+      include: { paidByUser: { select: { id: true, name: true } } },
     })
   }
 
@@ -54,11 +63,13 @@ export class HouseholdFinanceRepository {
     amount: number
     currency: string
     category: string | null
-    paidBy: string
+    paidByUserId: string
     store: string | null
     description: string | null
     occurredAt: Date
   }): Promise<HouseholdTransaction> {
+    // paidBy (the legacy free-text field) is intentionally left unset for
+    // new rows going forward — paidByUserId is the real attribution now.
     return this.db.householdTransaction.create({ data })
   }
 
@@ -69,7 +80,7 @@ export class HouseholdFinanceRepository {
       amount: number
       currency: string
       category: string | null
-      paidBy: string
+      paidByUserId: string
       store: string | null
       description: string | null
       occurredAt: Date

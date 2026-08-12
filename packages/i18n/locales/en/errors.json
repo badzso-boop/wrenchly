@@ -38,6 +38,12 @@
       "not_friends": "You're not friends with this user.",
       "user_not_found": "No user found with that username."
     },
+    "household_finance": {
+      "not_home_item": "This is only available for property/home items.",
+      "invalid_category": "Invalid category for this transaction type.",
+      "invalid_paid_by": "The selected person must be the item's owner or an accepted collaborator.",
+      "not_found": "Transaction not found."
+    },
     "item_collaborator": {
       "already_owner": "This user already owns the item.",
       "not_a_friend": "You can only invite accepted friends to collaborate.",

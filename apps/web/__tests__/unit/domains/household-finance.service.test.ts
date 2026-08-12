@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { HouseholdFinanceService } from '@/server/domains/household-finance/household-finance.service'
 
+vi.mock('@/server/domains/item/item-access.service', () => ({
+  resolveItemAccess: vi.fn().mockResolvedValue({ item: { userId: 'user-1' }, role: 'owner' }),
+}))
+
 const mockRepo = {
   findByIdAndUserId: vi.fn(),
   listByItemId: vi.fn(),
@@ -14,7 +18,9 @@ const mockItemRepo = {
   findByIdAndUserId: vi.fn(),
 }
 
-const service = new HouseholdFinanceService(mockRepo as any, mockItemRepo as any)
+const mockDb = {} as any
+
+const service = new HouseholdFinanceService(mockDb, mockRepo as any, mockItemRepo as any)
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -25,7 +31,7 @@ describe('HouseholdFinanceService.create', () => {
     itemId: 'item-1',
     type: 'EXPENSE' as const,
     amount: 5000,
-    paidBy: 'Norbi',
+    paidByUserId: 'user-1',
     occurredAt: new Date('2026-07-01'),
   }
 

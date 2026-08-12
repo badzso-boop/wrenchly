@@ -14,25 +14,23 @@ import { getCategoriesFor } from '@/server/domains/household-finance/household-f
 // Same currency list as the trip domain's AddTripLogForm — kept in sync deliberately.
 export const CURRENCIES = ['HUF', 'EUR', 'USD', 'GBP', 'CHF']
 
-// Hardcoded per the finalized spec (PR #14) — real user accounts/permissions for a shared
-// Home item are planned as a separate, later PR, not this one.
-export const PAID_BY_OPTIONS = ['Norbi', 'Dori']
-
 export function AddHouseholdTransactionForm({ itemId, onSuccess }: { itemId: string; onSuccess: () => void }) {
   const [type, setType] = useState<'EXPENSE' | 'INCOME'>('EXPENSE')
   const [occurredAt, setOccurredAt] = useState(new Date().toISOString().slice(0, 10))
   const [amount, setAmount] = useState('')
   const [currency, setCurrency] = useState('HUF')
   const [category, setCategory] = useState('')
-  const [paidBy, setPaidBy] = useState<string>(PAID_BY_OPTIONS[0] ?? 'Norbi')
+  const [paidByUserId, setPaidByUserId] = useState<string>('')
   const [store, setStore] = useState('')
   const [description, setDescription] = useState('')
 
+  const payers = api.itemCollaborator.listPayers.useQuery({ itemId })
   const create = api.householdFinance.create.useMutation({
     onSuccess: () => { toast.success('Transaction logged'); onSuccess() },
   })
 
   const categories = getCategoriesFor(type)
+  const effectivePaidByUserId = paidByUserId || payers.data?.[0]?.id || ''
 
   function handleTypeChange(v: string) {
     setType(v as 'EXPENSE' | 'INCOME')
@@ -47,7 +45,7 @@ export function AddHouseholdTransactionForm({ itemId, onSuccess }: { itemId: str
       amount: Number(amount),
       currency,
       category: category || undefined,
-      paidBy,
+      paidByUserId: effectivePaidByUserId,
       store: type === 'EXPENSE' && store ? store : undefined,
       description: description || undefined,
       occurredAt: new Date(occurredAt),
@@ -89,10 +87,10 @@ export function AddHouseholdTransactionForm({ itemId, onSuccess }: { itemId: str
             </div>
             <div className="space-y-2">
               <Label htmlFor="hf-paidby">Who</Label>
-              <Select value={paidBy} onValueChange={(v) => { if (v !== null) setPaidBy(v) }}>
-                <SelectTrigger id="hf-paidby"><SelectValue /></SelectTrigger>
+              <Select value={effectivePaidByUserId} onValueChange={(v) => { if (v !== null) setPaidByUserId(v) }}>
+                <SelectTrigger id="hf-paidby"><SelectValue placeholder="Select…" /></SelectTrigger>
                 <SelectContent>
-                  {PAID_BY_OPTIONS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                  {(payers.data ?? []).map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -128,7 +126,7 @@ export function AddHouseholdTransactionForm({ itemId, onSuccess }: { itemId: str
 
           {create.error && <p className="text-sm text-destructive">{create.error.message}</p>}
 
-          <Button type="submit" className="w-full" disabled={create.isPending || !amount}>
+          <Button type="submit" className="w-full" disabled={create.isPending || !amount || !effectivePaidByUserId}>
             {create.isPending ? 'Saving…' : 'Save'}
           </Button>
         </form>
