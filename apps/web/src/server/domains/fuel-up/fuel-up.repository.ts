@@ -1,4 +1,5 @@
 import type { PrismaClient, FuelUp } from '@prisma/client'
+import { resolveItemAccess } from '../item/item-access.service'
 
 export type FuelUpWithTrips = FuelUp & {
   trips: { id: string; startedAt: Date; distanceKm: number; description: string | null }[]
@@ -10,15 +11,20 @@ export class FuelUpRepository {
   constructor(private db: PrismaClient) {}
 
   async findByIdAndUserId(id: string, userId: string): Promise<FuelUpWithTrips | null> {
-    return this.db.fuelUp.findFirst({
-      where: { id, userId },
+    const fuelUp = await this.db.fuelUp.findUnique({
+      where: { id },
       include: { trips: { select: TRIP_SELECT } },
     })
+    if (!fuelUp) return null
+    const access = await resolveItemAccess(this.db, fuelUp.itemId, userId)
+    return access ? fuelUp : null
   }
 
   async listByItemId(itemId: string, userId: string): Promise<FuelUpWithTrips[]> {
+    const access = await resolveItemAccess(this.db, itemId, userId)
+    if (!access) return []
     return this.db.fuelUp.findMany({
-      where: { itemId, userId },
+      where: { itemId },
       include: { trips: { select: TRIP_SELECT } },
       orderBy: { occurredAt: 'desc' },
     })
@@ -27,8 +33,10 @@ export class FuelUpRepository {
   // Statistics need the full, unfiltered set for the item to compute all-time/monthly buckets
   // and the per-fuel-up consumption trend.
   async findAllByItemId(itemId: string, userId: string): Promise<FuelUpWithTrips[]> {
+    const access = await resolveItemAccess(this.db, itemId, userId)
+    if (!access) return []
     return this.db.fuelUp.findMany({
-      where: { itemId, userId },
+      where: { itemId },
       include: { trips: { select: TRIP_SELECT } },
       orderBy: { occurredAt: 'asc' },
     })
@@ -36,11 +44,13 @@ export class FuelUpRepository {
 
   // Every trip for this item, each with the ids of the fuel-up(s) already covering it — the
   // assignment UI shows all trips (not just unassigned ones), since a trip can belong to more
-  // than one fuel-up. Also doubles as the ownership check for assigning trips to a fuel-up: any
-  // id not present in this list doesn't belong to this item/user.
+  // than one fuel-up. Also doubles as the access check for assigning trips to a fuel-up: any
+  // id not present in this list doesn't belong to this item.
   async listTripsForItem(itemId: string, userId: string) {
+    const access = await resolveItemAccess(this.db, itemId, userId)
+    if (!access) return []
     return this.db.tripLog.findMany({
-      where: { itemId, userId },
+      where: { itemId },
       select: {
         id: true,
         startedAt: true,

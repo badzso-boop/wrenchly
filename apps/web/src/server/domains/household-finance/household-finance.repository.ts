@@ -1,4 +1,5 @@
 import type { PrismaClient, HouseholdTransaction, HouseholdTransactionType, Prisma } from '@prisma/client'
+import { resolveItemAccess } from '../item/item-access.service'
 
 export interface HouseholdFinanceListFilters {
   month?: string // 'YYYY-MM'
@@ -9,7 +10,10 @@ export class HouseholdFinanceRepository {
   constructor(private db: PrismaClient) {}
 
   async findByIdAndUserId(id: string, userId: string): Promise<HouseholdTransaction | null> {
-    return this.db.householdTransaction.findFirst({ where: { id, userId } })
+    const tx = await this.db.householdTransaction.findUnique({ where: { id } })
+    if (!tx) return null
+    const access = await resolveItemAccess(this.db, tx.itemId, userId)
+    return access ? tx : null
   }
 
   // Server-side filtering (month/type) rather than fetch-all-and-filter-in-the-client — a
@@ -20,7 +24,9 @@ export class HouseholdFinanceRepository {
     userId: string,
     filters?: HouseholdFinanceListFilters
   ): Promise<HouseholdTransaction[]> {
-    const where: Prisma.HouseholdTransactionWhereInput = { itemId, userId }
+    const access = await resolveItemAccess(this.db, itemId, userId)
+    if (!access) return []
+    const where: Prisma.HouseholdTransactionWhereInput = { itemId }
     if (filters?.type) where.type = filters.type
     if (filters?.month) {
       const parts = filters.month.split('-')
@@ -33,8 +39,10 @@ export class HouseholdFinanceRepository {
 
   // Statistics need the full, unfiltered set for the item to compute all-time/monthly buckets.
   async findAllByItemId(itemId: string, userId: string): Promise<HouseholdTransaction[]> {
+    const access = await resolveItemAccess(this.db, itemId, userId)
+    if (!access) return []
     return this.db.householdTransaction.findMany({
-      where: { itemId, userId },
+      where: { itemId },
       orderBy: { occurredAt: 'asc' },
     })
   }

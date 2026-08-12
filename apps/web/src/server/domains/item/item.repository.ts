@@ -1,4 +1,5 @@
 import { type PrismaClient, type Item, type ItemStatus, type ItemType } from '@prisma/client'
+import { resolveItemAccess, getAccessibleItemIds } from './item-access.service'
 
 export class ItemRepository {
   constructor(private db: PrismaClient) {}
@@ -7,13 +8,18 @@ export class ItemRepository {
     return this.db.item.findUnique({ where: { id } })
   }
 
+  /** Owner OR an ACCEPTED collaborator — NOT ownership-only. */
   async findByIdAndUserId(id: string, userId: string): Promise<Item | null> {
-    return this.db.item.findFirst({ where: { id, userId } })
+    const access = await resolveItemAccess(this.db, id, userId)
+    return access?.item ?? null
   }
 
+  /** Items the user owns, PLUS items they're an ACCEPTED collaborator on. */
   async findAllByUserId(userId: string, status?: ItemStatus): Promise<Item[]> {
+    const ids = await getAccessibleItemIds(this.db, userId)
+    if (ids.length === 0) return []
     return this.db.item.findMany({
-      where: { userId, ...(status ? { status } : {}) },
+      where: { id: { in: ids }, ...(status ? { status } : {}) },
       orderBy: { createdAt: 'desc' },
     })
   }
