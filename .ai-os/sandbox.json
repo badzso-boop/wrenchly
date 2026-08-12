@@ -1,4 +1,5 @@
 {
+  "image": "mcr.microsoft.com/playwright:v1.60.0-noble",
   "setup_commands": [
     "pnpm --filter @wrenchly/web db:generate"
   ],
