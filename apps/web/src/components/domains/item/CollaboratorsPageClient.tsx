@@ -4,7 +4,6 @@ import Link from 'next/link'
 import { ArrowLeft, UserPlus, Check, X, Trash2, LogOut } from 'lucide-react'
 import { toast } from 'sonner'
 import { api } from '@/lib/trpc/client'
-import { authClient } from '@/lib/auth/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -17,8 +16,8 @@ function initials(name: string): string {
 }
 
 export function CollaboratorsPageClient({ itemId }: { itemId: string }) {
-  const session = authClient.useSession()
-  const myUserId = session.data?.user?.id
+  const me = api.user.getMe.useQuery()
+  const myUserId = me.data?.id
 
   const item = api.item.getById.useQuery({ id: itemId })
   const collaborators = api.itemCollaborator.listForItem.useQuery({ itemId })

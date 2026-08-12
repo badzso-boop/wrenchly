@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react'
 import { UserPlus, Check, X, Trash2, Search } from 'lucide-react'
 import { toast } from 'sonner'
 import { api } from '@/lib/trpc/client'
-import { authClient } from '@/lib/auth/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -38,8 +37,8 @@ function UserRow({ user, right }: { user: PublicUser; right: React.ReactNode }) 
 }
 
 export function FriendsClient() {
-  const session = authClient.useSession()
-  const myUserId = session.data?.user?.id
+  const me = api.user.getMe.useQuery()
+  const myUserId = me.data?.id
 
   const utils = api.useUtils()
   const friends = api.friend.listFriends.useQuery()
