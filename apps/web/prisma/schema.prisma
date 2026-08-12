@@ -15,6 +15,7 @@ model User {
   email         String   @unique
   emailVerified Boolean  @default(false)
   name          String
+  username      String?  @unique // lowercase-normalized; see friend.service.ts for the uniqueness rule
   avatarUrl     String?
   locale        String   @default("en")
   timezone      String   @default("Europe/Budapest")
@@ -35,11 +36,78 @@ model User {
   shareExports      ShareExport[]
   notifications     SmartNotification[]
 
+  friendRequestsSent        FriendRequest[]        @relation("FriendRequestsSent")
+  friendRequestsReceived    FriendRequest[]        @relation("FriendRequestsReceived")
+  itemCollaborations        ItemCollaborator[]     @relation("ItemCollaborations")
+  itemCollaborationsInvited ItemCollaborator[]     @relation("ItemCollaborationsInvited")
+  paidHouseholdTransactions HouseholdTransaction[] @relation("HouseholdTransactionPaidBy")
+
   // Better Auth
   sessions Session[]
   accounts Account[]
 
   @@map("users")
+}
+
+enum FriendRequestStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+}
+
+// A single row per ordered (requester, addressee) pair models the whole
+// friendship lifecycle: PENDING -> ACCEPTED IS the friendship (no separate
+// row created on accept, just flip status + respondedAt). Unfriending
+// DELETES the row entirely (see friend.service.ts's remove()), so a removed
+// friendship can be re-requested fresh afterwards. A DECLINED row is
+// terminal — re-requesting after a decline flips the SAME row back to
+// PENDING (reversing requester/addressee to whoever is asking again) rather
+// than creating a duplicate row, since @@unique([requesterId, addresseeId])
+// only covers one direction.
+model FriendRequest {
+  id          String              @id @default(cuid())
+  requesterId String
+  addresseeId String
+  status      FriendRequestStatus @default(PENDING)
+  createdAt   DateTime            @default(now())
+  respondedAt DateTime?
+
+  requester User @relation("FriendRequestsSent", fields: [requesterId], references: [id], onDelete: Cascade)
+  addressee User @relation("FriendRequestsReceived", fields: [addresseeId], references: [id], onDelete: Cascade)
+
+  @@unique([requesterId, addresseeId])
+  @@index([addresseeId, status])
+  @@index([requesterId, status])
+  @@map("friend_requests")
+}
+
+enum ItemCollaboratorStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+}
+
+// Only ACCEPTED rows grant access — see item-access.service.ts. PENDING is
+// an outstanding invite; DECLINED is terminal for that row (re-inviting
+// after a decline flips it back to PENDING, mirroring FriendRequest's
+// policy, rather than erroring or duplicating).
+model ItemCollaborator {
+  id          String                 @id @default(cuid())
+  itemId      String
+  userId      String
+  invitedById String
+  status      ItemCollaboratorStatus @default(PENDING)
+  createdAt   DateTime               @default(now())
+  respondedAt DateTime?
+
+  item      Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  user      User @relation("ItemCollaborations", fields: [userId], references: [id], onDelete: Cascade)
+  invitedBy User @relation("ItemCollaborationsInvited", fields: [invitedById], references: [id], onDelete: Cascade)
+
+  @@unique([itemId, userId])
+  @@index([userId, status])
+  @@index([itemId, status])
+  @@map("item_collaborators")
 }
 
 // ─── AUTH (Better Auth) ─────────────────────────────────────────────────────
@@ -108,9 +176,9 @@ model Item {
   createdAt         DateTime   @default(now())
   updatedAt         DateTime   @updatedAt
 
-  user                  User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  parentItem            Item?                 @relation("ItemChildren", fields: [parentItemId], references: [id])
-  childItems            Item[]                @relation("ItemChildren")
+  user                  User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parentItem            Item?                  @relation("ItemChildren", fields: [parentItemId], references: [id])
+  childItems            Item[]                 @relation("ItemChildren")
   maintenanceRecords    MaintenanceRecord[]
   reminders             Reminder[]
   photos                Photo[]
@@ -123,6 +191,7 @@ model Item {
   householdTransactions HouseholdTransaction[]
   cookingLogEntries     CookingLogEntry[]
   favoriteMeals         FavoriteMeal[]
+  collaborators         ItemCollaborator[]
 
   vehicleProfile    VehicleProfile?
   propertyProfile   PropertyProfile?
@@ -220,7 +289,7 @@ model Part {
 }
 
 model TripLog {
-  id                 String   @id @default(cuid())
+  id                 String    @id @default(cuid())
   itemId             String
   userId             String
   startedAt          DateTime
@@ -230,14 +299,14 @@ model TripLog {
   startOdometer      Int
   distanceKm         Int
   endOdometer        Int
-  startFuelLiters    Decimal? @db.Decimal(6, 2)
-  totalExpenseCost   Decimal  @default(0) @db.Decimal(10, 2)
+  startFuelLiters    Decimal?  @db.Decimal(6, 2)
+  totalExpenseCost   Decimal   @default(0) @db.Decimal(10, 2)
   durationMin        Int? // BICYCLE/DRONE; VEHICLE/BOAT never set it
   elevationGainM     Int? // BICYCLE-specific
   batteryPercentUsed Int? // DRONE-specific
   maxAltitudeM       Int? // DRONE-specific
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   item     Item          @relation(fields: [itemId], references: [id], onDelete: Cascade)
   expenses TripExpense[]
@@ -277,7 +346,7 @@ model FuelUp {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  item  Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  item  Item      @relation(fields: [itemId], references: [id], onDelete: Cascade)
   trips TripLog[] @relation("TripFuelUps")
 
   @@index([itemId, occurredAt])
@@ -457,21 +526,21 @@ model InventoryItem {
 }
 
 model ShoppingListItem {
-  id              String           @id @default(cuid())
-  userId          String
-  itemId          String?
-  name            String
-  quantity        Decimal?         @db.Decimal(10, 3)
-  unit            String?
-  estimatedPrice  Decimal?         @db.Decimal(10, 2)
-  storeSuggestion String?
-  url             String?
-  priority        ShoppingPriority @default(MEDIUM)
-  status          ShoppingStatus   @default(PENDING)
-  notes           String?
+  id                String           @id @default(cuid())
+  userId            String
+  itemId            String?
+  name              String
+  quantity          Decimal?         @db.Decimal(10, 3)
+  unit              String?
+  estimatedPrice    Decimal?         @db.Decimal(10, 2)
+  storeSuggestion   String?
+  url               String?
+  priority          ShoppingPriority @default(MEDIUM)
+  status            ShoppingStatus   @default(PENDING)
+  notes             String?
   cookingLogEntryId String?
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
 
   user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   cookingLogEntry CookingLogEntry? @relation(fields: [cookingLogEntryId], references: [id], onDelete: SetNull)
@@ -748,23 +817,27 @@ enum HouseholdTransactionType {
 }
 
 model HouseholdTransaction {
-  id          String                   @id @default(cuid())
-  itemId      String
-  userId      String
-  type        HouseholdTransactionType
-  amount      Decimal                  @db.Decimal(10, 2)
-  currency    String                   @default("HUF")
-  category    String? // free string, not a DB enum — EXPENSE uses the expense list, INCOME
+  id           String                   @id @default(cuid())
+  itemId       String
+  userId       String
+  type         HouseholdTransactionType
+  amount       Decimal                  @db.Decimal(10, 2)
+  currency     String                   @default("HUF")
+  category     String? // free string, not a DB enum — EXPENSE uses the expense list, INCOME
   // uses the income list (see household-finance.categories.ts), same convention as
   // maintenance.category/PrintJob.materialType
-  paidBy      String // free string, hardcoded frontend dropdown for now (see plan doc)
-  store       String? // optional, expense-only in practice (e.g. "Lidl", "Wolt")
-  description String?
-  occurredAt  DateTime
-  createdAt   DateTime                 @default(now())
-  updatedAt   DateTime                 @updatedAt
+  paidBy       String? // LEGACY display-only fallback, no longer written by new transactions —
+  // superseded by paidByUserId (a real item owner/collaborator). Kept so pre-migration
+  // rows' historical text isn't silently lost; the UI prefers paidByUser.name when set.
+  paidByUserId String? // real user (item owner or ACCEPTED collaborator) who paid/received this
+  store        String? // optional, expense-only in practice (e.g. "Lidl", "Wolt")
+  description  String?
+  occurredAt   DateTime
+  createdAt    DateTime                 @default(now())
+  updatedAt    DateTime                 @updatedAt
 
-  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  item       Item  @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  paidByUser User? @relation("HouseholdTransactionPaidBy", fields: [paidByUserId], references: [id])
 
   cookingLogEntries CookingLogEntry[]
 
@@ -774,19 +847,19 @@ model HouseholdTransaction {
 }
 
 model CookingLogEntry {
-  id                  String    @id @default(cuid())
+  id                  String   @id @default(cuid())
   itemId              String
   userId              String
   name                String // the meal's name — fuzzy-matched against existing names on create
   ingredients         String? // free-text ingredient list (MVP: not structured)
   servings            Int?
   daysCovered         Int?
-  cost                Decimal?  @db.Decimal(10, 2)
-  currency            String    @default("HUF")
+  cost                Decimal? @db.Decimal(10, 2)
+  currency            String   @default("HUF")
   linkedTransactionId String? // optional link to the grocery expense that covered this meal
   cookedAt            DateTime
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
   item              Item                  @relation(fields: [itemId], references: [id], onDelete: Cascade)
   linkedTransaction HouseholdTransaction? @relation(fields: [linkedTransactionId], references: [id], onDelete: SetNull)
