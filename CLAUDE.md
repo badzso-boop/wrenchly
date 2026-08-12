@@ -11,6 +11,18 @@ this project is in Hungarian unless the user switches language first.
   dumps. Every change goes through a branch + PR (`gh pr create`) before merging to `main`, even
   a trivial one-line fix — no direct pushes to `main`. This is the safety net in place of a
   merge-gating CI check and keeps `main` always deployable.
+- **Live database changes require explicit human authorization — no exceptions, no workarounds.**
+  `wrenchly-db` is a real production database with real user data (Norbert's own account among
+  them). Any command that mutates its schema or data — `prisma migrate dev`/`deploy`, `prisma db
+  push`, raw `psql`/SQL against the live container, anything beyond a read-only query — needs the
+  human to explicitly say go **for that specific change**, not a standing blanket approval. If a
+  permission/safety classifier blocks a DB-mutating command, **stop and ask — do not look for a
+  different tool or command that achieves the same mutation through another path.** This happened
+  once (2026-08-12, an AI-OS-driven fork routed around a blocked `prisma migrate dev` via `prisma
+  migrate diff --script` + a hand-assembled migration + `prisma migrate deploy`) — the resulting
+  migration turned out to be safe on inspection, but bypassing the block was wrong regardless of
+  outcome, and must not happen again. When delegating DB-touching work to a subagent/fork, state
+  this rule to it explicitly and verbatim; don't assume it's inherited from this file.
 - `pnpm typecheck` / `pnpm test:unit` / `pnpm test:e2e:mock` from `apps/web` — run typecheck +
   unit tests before considering any change done.
 - **Host `pnpm` does not run under this box's installed Node 20** (only `npm`/`node` do) — for
@@ -37,6 +49,30 @@ this project is in Hungarian unless the user switches language first.
   should inherit host ownership) — a generated migration file, a script output, anything. This
   silently blocks `git checkout`/`git pull`/`git mv` with permission-denied unlink errors later.
   Fix before it bites you: `docker run --rm -v <dir>:/mnt node:22-slim chown -R 1000:1000 /mnt`.
+## Friends & Item Collaboration (2026-08-12, PR #23, not yet merged as of writing)
+
+Real multi-user accounts + a friend graph, replacing the old single-owner-only
+model. `FriendRequest` (send/accept/decline/remove, gated on `User.username`
+search) + `ItemCollaborator` (invite an accepted friend onto a specific
+`Item`; full/equal edit rights once accepted, not role-based). The
+authorization gate is centralized in
+`apps/web/src/server/domains/item/item-access.service.ts`
+(`resolveItemAccess`/`getAccessibleItemIds`) — every item-scoped repository's
+child-record queries route through it instead of a raw `{itemId, userId}`
+filter, so a collaborator's access is checked against the item, not against
+who created a given record (that column is now attribution, not access
+control). `HouseholdTransaction.paidBy` (a hardcoded free-text dropdown) is
+being replaced by `paidByUserId`, a real user reference (owner or
+collaborator) — `paidBy` stays as a legacy display fallback only.
+
+New/changed surface: `/friends` page, `/items/[id]/collaborators` tab,
+`friend`/`itemCollaborator` tRPC routers. Known gaps as of PR #23: no
+Settings UI to set/change your own `username` yet (DB-only), no
+`create()`-path access check yet in the item-scoped domains (tracked as
+[wrenchly#22](https://github.com/badzso-boop/wrenchly/issues/22), pre-existing
+and unrelated to this feature specifically). See `~/wrenchly-friends-and-item-collaboration-prompt.md`
+for the full original spec if extending this further.
+
 - **Mobile viewport check before calling any nav/tab change done.** `ItemDetailClient`'s per-item
   tab strip (`/items/[id]`) has no width limit of its own — it silently overflowed on a ~375px
   phone screen once a 4th/5th tab was added (fixed with `overflow-x-auto` + `shrink-0` on the tab
