@@ -28,7 +28,7 @@ function EditHouseholdTransactionForm({ tx, onDone }: { tx: HouseholdTransaction
   const [amount, setAmount] = useState(String(tx.amount))
   const [currency, setCurrency] = useState(tx.currency)
   const [category, setCategory] = useState(tx.category ?? '')
-  const [paidBy, setPaidBy] = useState(tx.paidBy)
+  const [paidBy, setPaidBy] = useState(tx.paidBy ?? '')
   const [store, setStore] = useState(tx.store ?? '')
   const [description, setDescription] = useState(tx.description ?? '')
 

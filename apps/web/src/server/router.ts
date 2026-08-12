@@ -18,6 +18,8 @@ import { householdFinanceRouter } from '@/server/domains/household-finance/house
 import { cookingRouter } from '@/server/domains/cooking/cooking.handler'
 import { favoriteMealRouter } from '@/server/domains/favorite-meal/favorite-meal.handler'
 import { fuelUpRouter } from '@/server/domains/fuel-up/fuel-up.handler'
+import { friendRouter } from '@/server/domains/friend/friend.handler'
+import { itemCollaboratorRouter } from '@/server/domains/item/item-collaborator.handler'
 
 export const appRouter = createTRPCRouter({
   item: itemRouter,
@@ -39,6 +41,8 @@ export const appRouter = createTRPCRouter({
   cooking: cookingRouter,
   favoriteMeal: favoriteMealRouter,
   fuelUp: fuelUpRouter,
+  friend: friendRouter,
+  itemCollaborator: itemCollaboratorRouter,
 })
 
 export type AppRouter = typeof appRouter

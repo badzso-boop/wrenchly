@@ -134,8 +134,12 @@ export class HouseholdFinanceService {
       amount: b.amount,
     }))
 
-    const expenseByPaidBy = breakdownBy(expenses, (t) => t.paidBy).map((b) => ({ paidBy: b.key, amount: b.amount }))
-    const incomeByPaidBy = breakdownBy(incomes, (t) => t.paidBy).map((b) => ({ paidBy: b.key, amount: b.amount }))
+    // `paidBy` is now a legacy display-only fallback (superseded by paidByUserId,
+    // see item-collaborator domain) - every row is backfilled so this is
+    // realistically never null in practice, but the type went optional with
+    // the migration. Real paidByUserId-based attribution is a later step.
+    const expenseByPaidBy = breakdownBy(expenses, (t) => t.paidBy ?? 'Unknown').map((b) => ({ paidBy: b.key, amount: b.amount }))
+    const incomeByPaidBy = breakdownBy(incomes, (t) => t.paidBy ?? 'Unknown').map((b) => ({ paidBy: b.key, amount: b.amount }))
 
     // Net balance per person: how much they've put into the shared pool (INCOME) minus how
     // much of the household's spending is attributed to them (EXPENSE) — positive means
