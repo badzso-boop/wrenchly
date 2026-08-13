@@ -19,7 +19,10 @@ export function CollaboratorsPageClient({ itemId }: { itemId: string }) {
   const me = api.user.getMe.useQuery()
   const myUserId = me.data?.id
 
-  const item = api.item.getById.useQuery({ id: itemId })
+  // Deliberately NOT item.getById: this page must work for a PENDING
+  // invitee too (they don't have real item access until they accept), so it
+  // uses the narrower, collaboration-scoped summary endpoint instead.
+  const item = api.itemCollaborator.getItemSummary.useQuery({ itemId })
   const collaborators = api.itemCollaborator.listForItem.useQuery({ itemId })
   const friends = api.friend.listFriends.useQuery()
   const utils = api.useUtils()
@@ -82,7 +85,18 @@ export function CollaboratorsPageClient({ itemId }: { itemId: string }) {
                 ) : (
                   <div className="flex gap-2">
                     <Select value={selectedFriendId} onValueChange={(v) => { if (v !== null) setSelectedFriendId(v) }}>
-                      <SelectTrigger className="flex-1"><SelectValue placeholder="Choose a friend" /></SelectTrigger>
+                      <SelectTrigger className="flex-1">
+                        {/* Base UI's SelectValue shows the raw `value` (here
+                            a user id) unless told how to render a label for
+                            it — without this, the closed trigger showed the
+                            UUID instead of the friend's name. */}
+                        <SelectValue placeholder="Choose a friend">
+                          {(v: string) => {
+                            const match = eligibleFriends.find((f) => f.id === v)
+                            return match ? `${match.name}${match.username ? ` (@${match.username})` : ''}` : 'Choose a friend'
+                          }}
+                        </SelectValue>
+                      </SelectTrigger>
                       <SelectContent>
                         {eligibleFriends.map((f) => (
                           <SelectItem key={f.id} value={f.id}>{f.name}{f.username ? ` (@${f.username})` : ''}</SelectItem>

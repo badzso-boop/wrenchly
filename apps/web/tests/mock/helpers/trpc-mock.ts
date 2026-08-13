@@ -9,6 +9,10 @@ type Handler = (input: unknown) => unknown
 const DEFAULT_HANDLERS: Record<string, Handler> = {
   'item.list': () => TEST_ITEMS,
   'item.getById': (input) => TEST_ITEMS.find((i) => i.id === (input as { id: string })?.id) ?? null,
+  'itemCollaborator.getItemSummary': (input) => {
+    const item = TEST_ITEMS.find((i) => i.id === (input as { itemId: string })?.itemId)
+    return item ? { id: item.id, name: item.name, userId: item.userId } : null
+  },
   'item.create': (input) => ({ ...TEST_ITEMS[0], ...(input as object), id: 'mock-new-item', createdAt: new Date().toISOString() }),
   'item.update': (input) => ({ ...TEST_ITEMS[0], ...(input as object) }),
   'item.delete': () => ({ id: 'mock-item-1' }),

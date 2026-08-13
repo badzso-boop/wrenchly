@@ -1,7 +1,7 @@
 import { TRPCError } from '@trpc/server'
 import { type PrismaClient, type ItemCollaborator, ItemCollaboratorStatus } from '@prisma/client'
 import { type ItemCollaboratorRepository, type ItemCollaboratorWithUser } from './item-collaborator.repository'
-import { resolveItemAccess } from './item-access.service'
+import { resolveItemAccess, hasAnyCollaborationRelationship } from './item-access.service'
 import { FriendRepository } from '@/server/domains/friend/friend.repository'
 import { FriendService } from '@/server/domains/friend/friend.service'
 
@@ -87,10 +87,31 @@ export class ItemCollaboratorService {
     await this.repo.delete(row.id)
   }
 
+  /** Deliberately gated by hasAnyCollaborationRelationship, not
+   * resolveItemAccess: a PENDING invitee must be able to see this list (it's
+   * where they accept/decline their own invite) even though they don't have
+   * real item access yet. See that helper's docstring for why. */
   async listForItem(itemId: string, requestingUserId: string): Promise<ItemCollaboratorWithUser[]> {
-    const access = await resolveItemAccess(this.db, itemId, requestingUserId)
-    if (!access) throw new TRPCError({ code: 'FORBIDDEN', message: 'errors.item.no_access' })
+    const allowed = await hasAnyCollaborationRelationship(this.db, itemId, requestingUserId)
+    if (!allowed) throw new TRPCError({ code: 'FORBIDDEN', message: 'errors.item.no_access' })
     return this.repo.listForItem(itemId)
+  }
+
+  /** Minimal item info (id + name only) for the collaborators page header —
+   * deliberately NOT full item detail (that stays behind resolveItemAccess
+   * via item.getById), gated the same way as listForItem so a PENDING
+   * invitee can see what item they were invited to before accepting. */
+  async getItemSummary(
+    itemId: string,
+    requestingUserId: string
+  ): Promise<{ id: string; name: string; userId: string }> {
+    const allowed = await hasAnyCollaborationRelationship(this.db, itemId, requestingUserId)
+    if (!allowed) throw new TRPCError({ code: 'FORBIDDEN', message: 'errors.item.no_access' })
+    const item = await this.db.item.findUniqueOrThrow({
+      where: { id: itemId },
+      select: { id: true, name: true, userId: true },
+    })
+    return item
   }
 
   /** Everyone eligible to be attributed as "who paid/earned" on this item: the

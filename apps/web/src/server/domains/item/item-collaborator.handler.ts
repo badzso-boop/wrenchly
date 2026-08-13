@@ -9,6 +9,11 @@ export const itemCollaboratorRouter = createTRPCRouter({
     return service.listForItem(input.itemId, ctx.userId)
   }),
 
+  getItemSummary: protectedProcedure.input(z.object({ itemId: z.string() })).query(({ ctx, input }) => {
+    const service = new ItemCollaboratorService(ctx.db, new ItemCollaboratorRepository(ctx.db))
+    return service.getItemSummary(input.itemId, ctx.userId)
+  }),
+
   listPayers: protectedProcedure.input(z.object({ itemId: z.string() })).query(({ ctx, input }) => {
     const service = new ItemCollaboratorService(ctx.db, new ItemCollaboratorRepository(ctx.db))
     return service.listPayers(input.itemId, ctx.userId)
@@ -31,7 +36,7 @@ export const itemCollaboratorRouter = createTRPCRouter({
           titleKey: 'notifications.item_collaboration_invite.title',
           bodyKey: 'notifications.item_collaboration_invite.body',
           bodyParams: { name: inviter?.name ?? 'Someone', itemName: item?.name ?? 'an item' },
-          actionUrl: `/items/${input.itemId}`,
+          actionUrl: `/items/${input.itemId}/collaborators`,
         },
       })
 

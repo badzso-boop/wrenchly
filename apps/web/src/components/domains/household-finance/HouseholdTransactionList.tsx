@@ -104,7 +104,13 @@ function EditHouseholdTransactionForm({
         <div className="space-y-1.5">
           <Label htmlFor={`edit-hf-paidby-${tx.id}`}>Who</Label>
           <Select value={paidByUserId} onValueChange={(v) => { if (v !== null) setPaidByUserId(v) }}>
-            <SelectTrigger id={`edit-hf-paidby-${tx.id}`}><SelectValue placeholder="Select…" /></SelectTrigger>
+            <SelectTrigger id={`edit-hf-paidby-${tx.id}`}>
+              {/* Base UI's SelectValue shows the raw `value` (a user id)
+                  unless told how to render a label for it. */}
+              <SelectValue placeholder="Select…">
+                {(v: string) => (payers.data ?? []).find((p) => p.id === v)?.name ?? 'Select…'}
+              </SelectValue>
+            </SelectTrigger>
             <SelectContent>
               {(payers.data ?? []).map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
             </SelectContent>

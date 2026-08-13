@@ -87,6 +87,7 @@ test.describe('Item Collaborators (mock)', () => {
     await setupTrpcMocks(page, {
       'item.getById': (input) =>
         (input as { id: string })?.id === SHARED_ITEM.id ? SHARED_ITEM : OWNED_ITEM,
+      'itemCollaborator.getItemSummary': () => ({ id: SHARED_ITEM.id, name: SHARED_ITEM.name, userId: SHARED_ITEM.userId }),
       'itemCollaborator.listForItem': () => [myAcceptedRow],
       'friend.listFriends': () => [],
     })

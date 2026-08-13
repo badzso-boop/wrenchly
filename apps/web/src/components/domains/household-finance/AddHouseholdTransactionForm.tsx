@@ -88,7 +88,13 @@ export function AddHouseholdTransactionForm({ itemId, onSuccess }: { itemId: str
             <div className="space-y-2">
               <Label htmlFor="hf-paidby">Who</Label>
               <Select value={effectivePaidByUserId} onValueChange={(v) => { if (v !== null) setPaidByUserId(v) }}>
-                <SelectTrigger id="hf-paidby"><SelectValue placeholder="Select…" /></SelectTrigger>
+                <SelectTrigger id="hf-paidby">
+                  {/* Base UI's SelectValue shows the raw `value` (a user id)
+                      unless told how to render a label for it. */}
+                  <SelectValue placeholder="Select…">
+                    {(v: string) => (payers.data ?? []).find((p) => p.id === v)?.name ?? 'Select…'}
+                  </SelectValue>
+                </SelectTrigger>
                 <SelectContent>
                   {(payers.data ?? []).map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
                 </SelectContent>
