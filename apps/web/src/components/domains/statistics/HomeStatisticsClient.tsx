@@ -1,5 +1,6 @@
 'use client'
 import { api } from '@/lib/trpc/client'
+import { format } from 'date-fns'
 import { BarChart } from './charts/BarChart'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -62,6 +63,14 @@ export function HomeStatisticsClient({ itemId }: { itemId: string }) {
   const mixedCurrencies = currencies.length > 1
   const costHint = mixedCurrencies ? 'Amounts added as-is, not converted' : undefined
 
+  const currentMonthKey = format(new Date(), 'yyyy-MM')
+  const currentMonth = monthly.find((m) => m.month === currentMonthKey) ?? {
+    month: currentMonthKey,
+    income: 0,
+    expense: 0,
+    balance: 0,
+  }
+
   const mealCounts = new Map<string, number>()
   for (const entry of cookingLog.data ?? []) {
     mealCounts.set(entry.name, (mealCounts.get(entry.name) ?? 0) + 1)
@@ -72,6 +81,25 @@ export function HomeStatisticsClient({ itemId }: { itemId: string }) {
 
   return (
     <div className="space-y-5">
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">This month</CardTitle>
+          <CardDescription>The whole household's income, expense, and what's left over — {format(new Date(), 'MMMM yyyy')}.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <StatTile label="Income" value={`${currentMonth.income.toLocaleString()} ${currency}`} hint={costHint ?? 'This month'} tone="positive" />
+            <StatTile label="Expense" value={`${currentMonth.expense.toLocaleString()} ${currency}`} hint={costHint ?? 'This month'} />
+            <StatTile
+              label="Remaining"
+              value={`${currentMonth.balance >= 0 ? '+' : ''}${currentMonth.balance.toLocaleString()} ${currency}`}
+              hint={currentMonth.balance >= 0 ? 'Left over so far' : 'Over budget so far'}
+              tone={currentMonth.balance >= 0 ? 'positive' : 'negative'}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <StatTile label="Total expense" value={`${allTime.expense.toLocaleString()} ${currency}`} hint={costHint ?? 'All-time'} />
         <StatTile label="Total income" value={`${allTime.income.toLocaleString()} ${currency}`} hint={costHint ?? 'All-time'} />
