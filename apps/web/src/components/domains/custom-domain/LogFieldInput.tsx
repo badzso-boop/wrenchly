@@ -187,8 +187,11 @@ export function formatLogFieldValue(field: FieldWithConfig, raw: unknown): strin
       return new Date(raw as string).toLocaleDateString()
     case 'DECIMAL': {
       const dp = field.fieldConfig?.decimalPlaces ?? undefined
-      return dp !== undefined ? Number(raw).toFixed(dp) : String(raw)
+      const formatted = dp !== undefined ? Number(raw).toFixed(dp) : String(raw)
+      return field.unit ? `${formatted} ${field.unit}` : formatted
     }
+    case 'NUMBER':
+      return field.unit ? `${raw} ${field.unit}` : String(raw)
     default:
       if (Array.isArray(raw)) return raw.join(', ')
       return String(raw)
