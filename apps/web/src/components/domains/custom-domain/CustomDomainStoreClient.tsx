@@ -2,7 +2,7 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { ArrowLeft, Download } from 'lucide-react'
+import { ArrowLeft, Download, Flame } from 'lucide-react'
 import { api } from '@/lib/trpc/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -23,7 +23,14 @@ function StoreEntryCard({ domain, onImported }: { domain: CustomDomainStoreListi
     <Card>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base">{domain.icon ? `${domain.icon} ` : ''}{domain.name}</CardTitle>
+          <div className="flex items-center gap-2">
+            <CardTitle className="text-base">{domain.icon ? `${domain.icon} ` : ''}{domain.name}</CardTitle>
+            {domain.importCount > 0 && (
+              <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
+                <Flame className="h-3 w-3" /> {domain.importCount}
+              </span>
+            )}
+          </div>
           <Button size="sm" disabled={importDomain.isPending} onClick={() => importDomain.mutate({ sourceDomainId: domain.id })}>
             <Download className="h-3.5 w-3.5 mr-1" /> {importDomain.isPending ? 'Importing…' : 'Import to my inventory'}
           </Button>
@@ -58,6 +65,9 @@ function StoreEntryCard({ domain, onImported }: { domain: CustomDomainStoreListi
 export function CustomDomainStoreClient() {
   const router = useRouter()
   const store = api.customDomainLog.listStore.useQuery()
+  // listStore already sorts most-imported first, so this is just where to draw the section break.
+  const popular = store.data?.filter((d) => d.importCount > 0) ?? []
+  const rest = store.data?.filter((d) => d.importCount === 0) ?? []
 
   return (
     <div className="flex flex-col h-full">
@@ -81,9 +91,26 @@ export function CustomDomainStoreClient() {
           {store.data?.length === 0 && (
             <p className="text-sm text-muted-foreground">No published custom domains yet.</p>
           )}
-          {store.data?.map((domain) => (
-            <StoreEntryCard key={domain.id} domain={domain} onImported={() => router.push('/settings')} />
-          ))}
+          {popular.length > 0 && (
+            <div className="space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1">
+                <Flame className="h-3.5 w-3.5" /> Most imported
+              </p>
+              {popular.map((domain) => (
+                <StoreEntryCard key={domain.id} domain={domain} onImported={() => router.push('/settings')} />
+              ))}
+            </div>
+          )}
+          {rest.length > 0 && (
+            <div className="space-y-3">
+              {popular.length > 0 && (
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">All domains</p>
+              )}
+              {rest.map((domain) => (
+                <StoreEntryCard key={domain.id} domain={domain} onImported={() => router.push('/settings')} />
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

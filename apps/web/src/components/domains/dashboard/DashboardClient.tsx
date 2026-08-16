@@ -1,7 +1,7 @@
 'use client'
 import { api } from '@/lib/trpc/client'
 import Link from 'next/link'
-import { Plus, ChevronRight } from 'lucide-react'
+import { Plus, ChevronRight, Store } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -49,6 +49,25 @@ export function DashboardClient() {
               <Plus className="h-4 w-4 mr-1" /> Add Your First Item
             </Button>
           </div>
+        )}
+
+        {!items.isLoading && activeItems.length > 0 && !activeItems.some((i) => i.type === 'CUSTOM') && (
+          <Link href="/custom-domains/store" className="group block mb-6">
+            <Card className="border-dashed transition-colors duration-200 hover:border-primary/50 hover:bg-accent/40">
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className="rounded-lg bg-primary/10 p-2 text-primary">
+                  <Store className="h-5 w-5" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium">Track something we don't cover yet</p>
+                  <p className="text-xs text-muted-foreground">
+                    Browse the Custom Domain Store — import a ready-made tracker (sports, hobbies, collections…) or build your own.
+                  </p>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all duration-150 shrink-0" />
+              </CardContent>
+            </Card>
+          </Link>
         )}
 
         {activeItems.length > 0 && (

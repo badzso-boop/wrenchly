@@ -15,7 +15,10 @@ export type CustomDomainWithFields = CustomDomain & { fields: FieldWithConfig[] 
 export type EntryWithValues = CustomItemDataEntry & {
   values: (CustomDomainFieldValue & { field: CustomDomainField })[]
 }
-export type CustomDomainStoreListing = CustomDomainWithFields & { customItemDataEntries: EntryWithValues[] }
+export type CustomDomainStoreListing = CustomDomainWithFields & {
+  customItemDataEntries: EntryWithValues[]
+  importCount: number
+}
 
 export class CustomDomainRepository {
   constructor(private db: PrismaClient) {}
@@ -297,9 +300,13 @@ export class CustomDomainRepository {
 
   /** Store listing includes each domain's single most-recent entry (by recordedAt, across any
    * item attached to it -- CustomItemDataEntry carries customDomainId directly, no need to know
-   * a specific item) as a read-only "sample data" preview for browsers who don't own the domain. */
+   * a specific item) as a read-only "sample data" preview for browsers who don't own the domain.
+   * Also carries `importCount` -- how many other CustomDomain rows point back at this one via
+   * `sourceDomainId` -- as a popularity proxy, sorted most-imported first. `sourceDomainId` is a
+   * plain pointer (not a Prisma relation, see its schema comment), so the count is a separate
+   * `groupBy` rather than an include. */
   async listPublished(): Promise<CustomDomainStoreListing[]> {
-    return this.db.customDomain.findMany({
+    const domains = await this.db.customDomain.findMany({
       where: { isPublished: true, isPublic: true },
       include: {
         fields: { where: { archivedAt: null }, orderBy: { order: 'asc' }, include: { fieldConfig: true } },
@@ -310,6 +317,18 @@ export class CustomDomainRepository {
         },
       },
     })
+    if (domains.length === 0) return []
+
+    const importCounts = await this.db.customDomain.groupBy({
+      by: ['sourceDomainId'],
+      where: { sourceDomainId: { in: domains.map((d) => d.id) } },
+      _count: { _all: true },
+    })
+    const countByDomainId = new Map(importCounts.map((c) => [c.sourceDomainId!, c._count._all]))
+
+    return domains
+      .map((d) => ({ ...d, importCount: countByDomainId.get(d.id) ?? 0 }))
+      .sort((a, b) => b.importCount - a.importCount)
   }
 
   /** Deep-copies a published domain's structure (fields + their configs) under a new owner, with
