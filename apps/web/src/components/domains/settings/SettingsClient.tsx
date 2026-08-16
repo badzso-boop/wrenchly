@@ -30,6 +30,10 @@ export function SettingsClient() {
     onSuccess: () => { calendarToken.refetch(); toast.success('Calendar link regenerated') },
   })
   const updateUser = api.user.update.useMutation({ onSuccess: () => { user.refetch(); toast.success('Profile saved') } })
+  const updateUsername = api.user.updateUsername.useMutation({
+    onSuccess: () => { user.refetch(); toast.success('Username saved') },
+    onError: (e) => toast.error(e.message),
+  })
   const upsertPref = api.user.upsertNotifPref.useMutation({ onSuccess: () => { notifPref.refetch(); toast.success('Preferences saved') } })
 
   const [copied, setCopied] = useState(false)
@@ -48,6 +52,7 @@ export function SettingsClient() {
   }
 
   const [name, setName] = useState('')
+  const [username, setUsername] = useState('')
   const [locale, setLocale] = useState<'en' | 'hu'>('en')
   const [timezone, setTimezone] = useState('Europe/Budapest')
   const [pushEnabled, setPushEnabled] = useState(true)
@@ -60,6 +65,7 @@ export function SettingsClient() {
   useEffect(() => {
     if (user.data) {
       setName(user.data.name ?? '')
+      setUsername(user.data.username ?? '')
       setLocale((user.data.locale as 'en' | 'hu') ?? 'en')
       setTimezone(user.data.timezone ?? 'Europe/Budapest')
     }
@@ -105,6 +111,32 @@ export function SettingsClient() {
               <div className="space-y-2">
                 <Label htmlFor="name">Name</Label>
                 <Input id="name" value={name} onChange={(e) => setName((e.target as HTMLInputElement).value)} placeholder="Your name" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="username">Username</Label>
+                <p className="text-xs text-muted-foreground">
+                  Lets friends find you and invite you to cooperate on their items.
+                </p>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">@</span>
+                    <Input
+                      id="username"
+                      value={username}
+                      onChange={(e) => setUsername((e.target as HTMLInputElement).value.toLowerCase())}
+                      placeholder="yourname"
+                      className="pl-7"
+                      maxLength={20}
+                    />
+                  </div>
+                  <Button
+                    variant="outline"
+                    disabled={updateUsername.isPending || username === (user.data?.username ?? '') || username.length === 0}
+                    onClick={() => updateUsername.mutate({ username })}
+                  >
+                    {updateUsername.isPending ? 'Saving…' : 'Save'}
+                  </Button>
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>

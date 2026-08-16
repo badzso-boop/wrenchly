@@ -1,4 +1,5 @@
 import { type PrismaClient, type TripLog, type TripExpense } from '@prisma/client'
+import { resolveItemAccess } from '../item/item-access.service'
 
 type TripLogWithChildren = TripLog & { expenses: TripExpense[] }
 
@@ -6,10 +7,10 @@ export class TripRepository {
   constructor(private db: PrismaClient) {}
 
   async findByIdAndUserId(id: string, userId: string): Promise<TripLogWithChildren | null> {
-    return this.db.tripLog.findFirst({
-      where: { id, userId },
-      include: { expenses: true },
-    })
+    const trip = await this.db.tripLog.findUnique({ where: { id }, include: { expenses: true } })
+    if (!trip) return null
+    const access = await resolveItemAccess(this.db, trip.itemId, userId)
+    return access ? trip : null
   }
 
   async findByItemId(
@@ -18,8 +19,10 @@ export class TripRepository {
     cursor?: string,
     limit = 20
   ): Promise<TripLogWithChildren[]> {
+    const access = await resolveItemAccess(this.db, itemId, userId)
+    if (!access) return []
     return this.db.tripLog.findMany({
-      where: { itemId, userId },
+      where: { itemId },
       include: { expenses: true },
       orderBy: { startedAt: 'desc' },
       take: limit,
@@ -28,8 +31,10 @@ export class TripRepository {
   }
 
   async findAllByItemId(itemId: string, userId: string): Promise<TripLogWithChildren[]> {
+    const access = await resolveItemAccess(this.db, itemId, userId)
+    if (!access) return []
     return this.db.tripLog.findMany({
-      where: { itemId, userId },
+      where: { itemId },
       include: { expenses: true },
       orderBy: { startedAt: 'asc' },
     })

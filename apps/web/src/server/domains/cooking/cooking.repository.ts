@@ -1,15 +1,21 @@
 import type { PrismaClient, CookingLogEntry, ShoppingListItem } from '@prisma/client'
+import { resolveItemAccess } from '../item/item-access.service'
 
 export class CookingRepository {
   constructor(private db: PrismaClient) {}
 
   async findByIdAndUserId(id: string, userId: string): Promise<CookingLogEntry | null> {
-    return this.db.cookingLogEntry.findFirst({ where: { id, userId } })
+    const entry = await this.db.cookingLogEntry.findUnique({ where: { id } })
+    if (!entry) return null
+    const access = await resolveItemAccess(this.db, entry.itemId, userId)
+    return access ? entry : null
   }
 
   async listByItemId(itemId: string, userId: string): Promise<CookingLogEntry[]> {
+    const access = await resolveItemAccess(this.db, itemId, userId)
+    if (!access) return []
     return this.db.cookingLogEntry.findMany({
-      where: { itemId, userId },
+      where: { itemId },
       orderBy: { cookedAt: 'desc' },
     })
   }

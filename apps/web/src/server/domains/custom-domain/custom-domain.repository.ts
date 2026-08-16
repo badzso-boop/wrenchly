@@ -9,6 +9,7 @@ import {
   type FieldType,
   Prisma,
 } from '@prisma/client'
+import { resolveItemAccess } from '../item/item-access.service'
 
 export type FieldWithConfig = CustomDomainField & { fieldConfig: CustomDomainFieldConfig | null }
 export type CustomDomainWithFields = CustomDomain & { fields: FieldWithConfig[] }
@@ -195,11 +196,16 @@ export class CustomDomainRepository {
     })
   }
 
+  /** Owner OR an ACCEPTED collaborator on the entry's item — NOT "only the user who
+   * originally logged this entry" (entry.userId is attribution, not access control). */
   async findEntryByIdAndUserId(entryId: string, userId: string): Promise<EntryWithValues | null> {
-    return this.db.customItemDataEntry.findFirst({
-      where: { id: entryId, userId },
+    const entry = await this.db.customItemDataEntry.findUnique({
+      where: { id: entryId },
       include: { values: { include: { field: true } } },
     })
+    if (!entry) return null
+    const access = await resolveItemAccess(this.db, entry.itemId, userId)
+    return access ? entry : null
   }
 
   async listEntriesByItemId(itemId: string): Promise<EntryWithValues[]> {

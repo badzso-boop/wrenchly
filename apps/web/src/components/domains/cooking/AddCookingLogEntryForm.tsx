@@ -132,7 +132,20 @@ export function AddCookingLogEntryForm({
                 value={linkedTransactionId || 'none'}
                 onValueChange={(v) => { if (v !== null) setLinkedTransactionId(v === 'none' ? '' : v) }}
               >
-                <SelectTrigger id="cl-linked-tx"><SelectValue placeholder="None" /></SelectTrigger>
+                <SelectTrigger id="cl-linked-tx">
+                  {/* Base UI's SelectValue shows the raw `value` (here a
+                      transaction id) unless told how to render a label for
+                      it — without this, the closed trigger showed the UUID
+                      instead of the transaction's date/amount. */}
+                  <SelectValue placeholder="None">
+                    {(v: string) => {
+                      if (!v || v === 'none') return 'None'
+                      const match = groceryExpenses.find((e) => e.id === v)
+                      if (!match) return 'None'
+                      return `${new Date(match.occurredAt).toLocaleDateString()} — ${Number(match.amount).toLocaleString()} ${match.currency}${match.store ? ` (${match.store})` : ''}`
+                    }}
+                  </SelectValue>
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">None</SelectItem>
                   {groceryExpenses.map((e) => (

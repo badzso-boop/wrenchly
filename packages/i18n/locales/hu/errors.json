@@ -26,6 +26,33 @@
     "upload": {
       "failed": "A feltöltés sikertelen.",
       "file_too_large": "A fájl mérete meghaladja a megengedett határt."
+    },
+    "friend": {
+      "cannot_request_self": "Nem küldhetsz baráti kérést önmagadnak.",
+      "already_friends": "Már barátok vagytok ezzel a felhasználóval.",
+      "request_already_pending": "Már van függőben lévő kérés ezzel a felhasználóval.",
+      "request_not_found": "A baráti kérés nem található.",
+      "not_addressee": "Csak a címzett válaszolhat erre a kérésre.",
+      "not_requester": "Csak a küldő vonhatja vissza ezt a kérést.",
+      "request_not_pending": "Erre a kérésre már történt válasz.",
+      "not_friends": "Nem vagytok barátok ezzel a felhasználóval.",
+      "user_not_found": "Nincs ilyen felhasználónevű felhasználó."
+    },
+    "household_finance": {
+      "not_home_item": "Ez csak ingatlan/otthon elemekhez érhető el.",
+      "invalid_category": "Érvénytelen kategória ehhez a tranzakció-típushoz.",
+      "invalid_paid_by": "A kiválasztott személynek az elem tulajdonosának vagy elfogadott együttműködőnek kell lennie.",
+      "not_found": "A tranzakció nem található."
+    },
+    "item_collaborator": {
+      "already_owner": "Ez a felhasználó már tulajdonosa az elemnek.",
+      "not_a_friend": "Csak elfogadott barátokat hívhatsz meg együttműködésre.",
+      "already_collaborator": "Ez a felhasználó már együttműködő ezen az elemen.",
+      "invite_already_pending": "Már van függőben lévő meghívás ehhez a felhasználóhoz.",
+      "invite_not_found": "Az együttműködési meghívás nem található.",
+      "not_invitee": "Csak a meghívott felhasználó válaszolhat erre a meghívásra.",
+      "invite_not_pending": "Erre a meghívásra már történt válasz.",
+      "not_owner": "Csak az elem tulajdonosa teheti ezt meg."
     }
   }
 }

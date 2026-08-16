@@ -1,4 +1,5 @@
 'use client'
+import { useRouter } from 'next/navigation'
 import { api } from '@/lib/trpc/client'
 import { CheckCheck, Bell } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -8,6 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 
 export function NotificationsClient() {
+  const router = useRouter()
   const notifications = api.notification.list.useQuery({ unreadOnly: false })
   const markRead = api.notification.markRead.useMutation({ onSuccess: () => notifications.refetch() })
   const markAll = api.notification.markAllRead.useMutation({ onSuccess: () => notifications.refetch() })
@@ -46,36 +48,48 @@ export function NotificationsClient() {
         )}
 
         <div className="max-w-2xl mx-auto space-y-2">
-          {notifications.data?.map((n) => (
-            <Card
-              key={n.id}
-              className={cn(
-                'transition-all duration-200',
-                !n.readAt && 'border-primary/30 bg-primary/5'
-              )}
-            >
-              <CardContent className="p-4 flex items-start gap-4">
-                <div className={cn('mt-0.5 h-2 w-2 rounded-full shrink-0', n.readAt ? 'bg-transparent' : 'bg-primary')} />
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm">{n.title}</p>
-                  <p className="text-sm text-muted-foreground">{n.body}</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {new Date(n.triggeredAt).toLocaleString()}
-                  </p>
-                </div>
-                {!n.readAt && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="shrink-0 text-xs h-7"
-                    onClick={() => markRead.mutate({ id: n.id })}
-                  >
-                    Mark read
-                  </Button>
+          {notifications.data?.map((n) => {
+            const hasAction = !!n.actionUrl
+            function open() {
+              if (!n.readAt) markRead.mutate({ id: n.id })
+              if (n.actionUrl) router.push(n.actionUrl)
+            }
+            return (
+              <Card
+                key={n.id}
+                role={hasAction ? 'button' : undefined}
+                tabIndex={hasAction ? 0 : undefined}
+                onClick={hasAction ? open : undefined}
+                onKeyDown={hasAction ? (e) => { if (e.key === 'Enter' || e.key === ' ') open() } : undefined}
+                className={cn(
+                  'transition-all duration-200',
+                  !n.readAt && 'border-primary/30 bg-primary/5',
+                  hasAction && 'cursor-pointer hover:border-primary/50'
                 )}
-              </CardContent>
-            </Card>
-          ))}
+              >
+                <CardContent className="p-4 flex items-start gap-4">
+                  <div className={cn('mt-0.5 h-2 w-2 rounded-full shrink-0', n.readAt ? 'bg-transparent' : 'bg-primary')} />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm">{n.title}</p>
+                    <p className="text-sm text-muted-foreground">{n.body}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {new Date(n.triggeredAt).toLocaleString()}
+                    </p>
+                  </div>
+                  {!n.readAt && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="shrink-0 text-xs h-7"
+                      onClick={(e) => { e.stopPropagation(); markRead.mutate({ id: n.id }) }}
+                    >
+                      Mark read
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            )
+          })}
         </div>
       </div>
     </div>

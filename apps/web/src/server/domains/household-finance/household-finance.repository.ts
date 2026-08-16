@@ -1,15 +1,23 @@
 import type { PrismaClient, HouseholdTransaction, HouseholdTransactionType, Prisma } from '@prisma/client'
+import { resolveItemAccess } from '../item/item-access.service'
 
 export interface HouseholdFinanceListFilters {
   month?: string // 'YYYY-MM'
   type?: HouseholdTransactionType
 }
 
+export type HouseholdTransactionWithPaidByUser = HouseholdTransaction & {
+  paidByUser: { id: string; name: string } | null
+}
+
 export class HouseholdFinanceRepository {
   constructor(private db: PrismaClient) {}
 
   async findByIdAndUserId(id: string, userId: string): Promise<HouseholdTransaction | null> {
-    return this.db.householdTransaction.findFirst({ where: { id, userId } })
+    const tx = await this.db.householdTransaction.findUnique({ where: { id } })
+    if (!tx) return null
+    const access = await resolveItemAccess(this.db, tx.itemId, userId)
+    return access ? tx : null
   }
 
   // Server-side filtering (month/type) rather than fetch-all-and-filter-in-the-client — a
@@ -19,8 +27,10 @@ export class HouseholdFinanceRepository {
     itemId: string,
     userId: string,
     filters?: HouseholdFinanceListFilters
-  ): Promise<HouseholdTransaction[]> {
-    const where: Prisma.HouseholdTransactionWhereInput = { itemId, userId }
+  ): Promise<HouseholdTransactionWithPaidByUser[]> {
+    const access = await resolveItemAccess(this.db, itemId, userId)
+    if (!access) return []
+    const where: Prisma.HouseholdTransactionWhereInput = { itemId }
     if (filters?.type) where.type = filters.type
     if (filters?.month) {
       const parts = filters.month.split('-')
@@ -28,14 +38,21 @@ export class HouseholdFinanceRepository {
       const month = Number(parts[1])
       where.occurredAt = { gte: new Date(year, month - 1, 1), lt: new Date(year, month, 1) }
     }
-    return this.db.householdTransaction.findMany({ where, orderBy: { occurredAt: 'desc' } })
+    return this.db.householdTransaction.findMany({
+      where,
+      orderBy: { occurredAt: 'desc' },
+      include: { paidByUser: { select: { id: true, name: true } } },
+    })
   }
 
   // Statistics need the full, unfiltered set for the item to compute all-time/monthly buckets.
-  async findAllByItemId(itemId: string, userId: string): Promise<HouseholdTransaction[]> {
+  async findAllByItemId(itemId: string, userId: string): Promise<HouseholdTransactionWithPaidByUser[]> {
+    const access = await resolveItemAccess(this.db, itemId, userId)
+    if (!access) return []
     return this.db.householdTransaction.findMany({
-      where: { itemId, userId },
+      where: { itemId },
       orderBy: { occurredAt: 'asc' },
+      include: { paidByUser: { select: { id: true, name: true } } },
     })
   }
 
@@ -46,11 +63,13 @@ export class HouseholdFinanceRepository {
     amount: number
     currency: string
     category: string | null
-    paidBy: string
+    paidByUserId: string
     store: string | null
     description: string | null
     occurredAt: Date
   }): Promise<HouseholdTransaction> {
+    // paidBy (the legacy free-text field) is intentionally left unset for
+    // new rows going forward — paidByUserId is the real attribution now.
     return this.db.householdTransaction.create({ data })
   }
 
@@ -61,7 +80,7 @@ export class HouseholdFinanceRepository {
       amount: number
       currency: string
       category: string | null
-      paidBy: string
+      paidByUserId: string
       store: string | null
       description: string | null
       occurredAt: Date

@@ -1,5 +1,6 @@
 import { type PrismaClient, type MaintenanceRecord, type Part } from '@prisma/client'
 import { format } from 'date-fns'
+import { resolveItemAccess } from '../item/item-access.service'
 
 type MaintenanceRecordWithParts = MaintenanceRecord & { parts: Part[] }
 
@@ -13,11 +14,12 @@ export class MaintenanceRepository {
     })
   }
 
+  /** Owner OR an ACCEPTED collaborator on the record's item — NOT ownership-only. */
   async findByIdAndUserId(id: string, userId: string): Promise<MaintenanceRecordWithParts | null> {
-    return this.db.maintenanceRecord.findFirst({
-      where: { id, userId },
-      include: { parts: true },
-    })
+    const record = await this.db.maintenanceRecord.findUnique({ where: { id }, include: { parts: true } })
+    if (!record) return null
+    const access = await resolveItemAccess(this.db, record.itemId, userId)
+    return access ? record : null
   }
 
   async findByItemId(
@@ -26,8 +28,10 @@ export class MaintenanceRepository {
     cursor?: string,
     limit = 20
   ): Promise<MaintenanceRecordWithParts[]> {
+    const access = await resolveItemAccess(this.db, itemId, userId)
+    if (!access) return []
     return this.db.maintenanceRecord.findMany({
-      where: { itemId, userId },
+      where: { itemId },
       include: { parts: true },
       orderBy: { performedAt: 'desc' },
       take: limit,
@@ -115,8 +119,10 @@ export class MaintenanceRepository {
     userId: string,
     category: string
   ): Promise<{ month: string; count: number }[]> {
+    const access = await resolveItemAccess(this.db, itemId, userId)
+    if (!access) return []
     const records = await this.db.maintenanceRecord.findMany({
-      where: { itemId, userId, category },
+      where: { itemId, category },
       select: { performedAt: true },
     })
 
