@@ -6,6 +6,9 @@ import {
   type CustomItemData,
   type CustomItemDataEntry,
   type CustomDomainFieldValue,
+  type CustomDomainChart,
+  type ChartType,
+  type ChartAggregation,
   type FieldType,
   Prisma,
 } from '@prisma/client'
@@ -16,6 +19,7 @@ export type CustomDomainWithFields = CustomDomain & { fields: FieldWithConfig[] 
 export type EntryWithValues = CustomItemDataEntry & {
   values: (CustomDomainFieldValue & { field: CustomDomainField })[]
 }
+export type ChartWithField = CustomDomainChart & { field: CustomDomainField }
 export type CustomDomainStoreListing = CustomDomainWithFields & {
   customItemDataEntries: EntryWithValues[]
   importCount: number
@@ -385,5 +389,41 @@ export class CustomDomainRepository {
       },
       include: { fields: { orderBy: { order: 'asc' }, include: { fieldConfig: true } } },
     })
+  }
+
+  // ─── Statistics: user-defined charts over a domain's loggable fields ─────────
+
+  async listCharts(customDomainId: string): Promise<ChartWithField[]> {
+    return this.db.customDomainChart.findMany({
+      where: { customDomainId },
+      include: { field: true },
+      orderBy: { order: 'asc' },
+    })
+  }
+
+  async findChartById(chartId: string): Promise<ChartWithField | null> {
+    return this.db.customDomainChart.findUnique({ where: { id: chartId }, include: { field: true } })
+  }
+
+  async createChart(
+    customDomainId: string,
+    data: { fieldId: string; name: string; chartType: ChartType; aggregation: ChartAggregation; order: number }
+  ): Promise<ChartWithField> {
+    return this.db.customDomainChart.create({
+      data: { customDomainId, ...data },
+      include: { field: true },
+    })
+  }
+
+  async deleteChart(chartId: string): Promise<void> {
+    await this.db.customDomainChart.delete({ where: { id: chartId } })
+  }
+
+  async reorderCharts(orderedChartIds: string[]): Promise<void> {
+    await this.db.$transaction(
+      orderedChartIds.map((id, index) =>
+        this.db.customDomainChart.update({ where: { id }, data: { order: index } })
+      )
+    )
   }
 }

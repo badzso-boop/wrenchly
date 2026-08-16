@@ -96,3 +96,118 @@ A user flow körül két, a meglévő rendszert additívan bővítő változtat�
    Domain rendszert — utána eltűnik, nem nyomasztja folyamatosan a régi felhasználókat.
 
 Mindkettő tesztelve: `pnpm typecheck` tiszta, `pnpm test:unit` 334/334 zöld.
+
+---
+
+## 2. kör (2026-08-16): TIME mezőtípus + Custom Domain Statisztika
+
+### TIME mezőtípus
+
+Új `FieldType.TIME` érték, elérhető mind a Profile mezőknél (`CustomDomainManager.tsx` "Add
+field" gyorsform), mind a Log-tab widgeteknél (`custom-log-field-types.ts` "+" picker). Tárolás:
+a meglévő `valueString` oszlopot használja újra (`"HH:mm"`, 24 órás formátum), tehát **nem kell
+új oszlop** — csak az enum bővül. Validáció (`field-value.validation.ts`): regex
+`^([01]\d|2[0-3]):[0-5]\d$`. UI: natív `<input type="time">`.
+
+Érintett fájlok: `prisma/schema.prisma` (enum), `field-value.validation.ts`,
+`custom-log-field-types.ts` (Clock ikon), `LogFieldInput.tsx`, `CustomDomainManager.tsx`
+(`FIELD_TYPES`), `CustomProfileClient.tsx` (`FIELD_TYPE_MAP`), `profile.fields.ts`
+(`ProfileFieldType`), `ProfileFieldInput.tsx`.
+
+### Statisztika/grafikon architektúra — döntés
+
+A projektben **már létezik** egy kézzel írt, függőségmentes SVG-grafikon-motor
+(`components/domains/statistics/charts/LineChart.tsx` + `BarChart.tsx`), amit a beépített
+item-típusok (Pet, Plant, Property, stb.) statikus `MetricDef` regisztrumból
+(`reading.fields.ts`) hajtanak meg (`reading.service.ts`'s `getStatistics`). A Custom Domain
+statisztika ennek a mintának a **futásidőben, a userek által konfigurált** megfelelője — nem új
+chartkönyvtár (pl. recharts) bevezetése, hanem a meglévő `LineChart`/`BarChart` komponensek
+újrahasznosítása. Ezért az induló grafikontípus-kínálat is pont ez a kettő:
+
+- **Line** — minden naplózott bejegyzés nyers trendje időben
+- **Bar (havi)** — bejegyzések összege naptári hónaponként csoportosítva
+
+Pite/donut chart (kategorikus mezőkhöz, pl. ENUM eloszlás) tudatosan **nincs** az induló körben —
+nincs hozzá kész komponens, és a kérés "csak az alap grafikonok" scope-ja ezt nem indokolja; ha
+kell, ez egy jól elkülöníthető következő lépés.
+
+### Adatbázis séma
+
+```prisma
+enum ChartType {
+  LINE
+  BAR_MONTHLY
+}
+
+enum ChartAggregation {
+  LATEST // stat tile a legutóbbi értéket mutatja
+  SUM    // stat tile egy futó összeget mutat
+}
+
+model CustomDomainChart {
+  id             String            @id @default(cuid())
+  customDomainId String
+  fieldId        String
+  name           String
+  chartType      ChartType         @default(LINE)
+  aggregation    ChartAggregation  @default(LATEST)
+  order          Int               @default(0)
+  createdAt      DateTime          @default(now())
+
+  customDomain CustomDomain      @relation(fields: [customDomainId], references: [id], onDelete: Cascade)
+  field        CustomDomainField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+
+  @@index([customDomainId])
+  @@map("custom_domain_charts")
+}
+```
+
+`fieldId` csak `loggable: true` és `fieldType` NUMBER/DECIMAL mezőre mutathat — ez a service
+rétegben van kikényszerítve (`CHARTABLE_FIELD_TYPES`), nem DB-constraint-ként, ugyanúgy, ahogy a
+domain publikálás-lock és a többi üzleti szabály is ebben a rétegben él.
+
+**Nincs benne** (tudatosan kihagyva a scope-ból, jövőbeli bővítés):
+- kategorikus (ENUM/BOOLEAN) mezők eloszlás-grafikonja (Pie/Bar-by-category)
+- `cloneDomain` (Store import) egyelőre **nem** másolja át a chart-definíciókat az új
+  tulajdonoshoz — csak a mezőstruktúrát, ahogy eddig is. Ennek pótlása egy külön lépés (a
+  klónozott mezők új id-jét kellene visszakötni a chartokhoz key alapján).
+
+### Backend
+
+- `custom-domain.repository.ts`: `listCharts`, `findChartById`, `createChart`, `deleteChart`,
+  `reorderCharts` — ugyanaz a minta, mint a `CustomDomainField` CRUD-ja.
+- `custom-domain-log.service.ts`: a chart CRUD validációval (tulajdonjog, mező tényleg loggable
+  numerikus mező-e), és `getStatistics(itemId, userId)`, ami **szó szerint ugyanazt a
+  trend/monthly/total/latest számítást végzi**, mint `reading.service.ts`'s `getStatistics` — a
+  Custom Domain chart csak a statikus `MetricDef` user-authored megfelelője.
+- `customDomainLog` tRPC router: `listCharts`, `createChart`, `deleteChart`, `reorderCharts`,
+  `getStatistics` — a meglévő routerbe kerültek (nem külön domain), mert a "Log tab widget
+  builder" szekció mellé szervesen illeszkednek.
+
+### Frontend
+
+- `ChartBuilder.tsx` (új): a Custom Domains oldal domain-sorának kinyitott nézetében, a Log-tab
+  builder alatt — mező kiválasztása (csak numerikus loggable mezők), grafikontípus (Line/Bar),
+  "stat tile" aggregáció (Latest/Total), opcionális név.
+- `CustomDomainStatisticsClient.tsx` (új): 1:1 mintázva `ReadingStatisticsClient.tsx`-re,
+  ugyanazokkal a `LineChart`/`BarChart` komponensekkel.
+- `StatisticsPageClient.tsx`: új ág `item.data?.type === 'CUSTOM'` esetén (korábban ez a
+  `ReadingStatisticsClient`-be futott bele üresen, mert `CUSTOM`-ra nincs `READING_METRICS`
+  bejegyzés).
+- `ItemDetailClient.tsx`: új "Statistics" tab CUSTOM itemeknél, ugyanazzal a feltétellel mint a
+  "Log" tab (`hasCustomLogFields`) — csak akkor jelenik meg, ha a domainnek ténylegesen van aktív
+  loggable mezője.
+
+### Tesztelés
+
+`pnpm typecheck` tiszta, unit tesztek: új esetek a `field-value.validation.test.ts`-ben (TIME
+elfogadás/elutasítás) és a `custom-domain-log.service.test.ts`-ben (chart csak numerikus+loggable
+mezőre hozható létre, `getStatistics` trend/monthly/total/latest számítás) — összesen 343/343
+zöld.
+
+### Élő adatbázis-migráció — jóváhagyás szükséges
+
+A `prisma/schema.prisma` módosult (`FieldType.TIME` + `CustomDomainChart` tábla + két új enum),
+de **migráció még nincs generálva/alkalmazva** az éles `wrenchly-db`-n — a repo szabálya szerint
+ehhez kifejezett, erre a konkrét változtatásra vonatkozó jóváhagyás kell tőled, mielőtt bármilyen
+`prisma migrate` parancs fut a live DB ellen.

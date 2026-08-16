@@ -6,6 +6,7 @@ import { TripStatisticsClient } from './TripStatisticsClient'
 import { ReadingStatisticsClient } from './ReadingStatisticsClient'
 import { PrintJobStatisticsClient } from './PrintJobStatisticsClient'
 import { HomeStatisticsClient } from './HomeStatisticsClient'
+import { CustomDomainStatisticsClient } from '@/components/domains/custom-domain/CustomDomainStatisticsClient'
 import { isTripLogItemType } from '@/server/domains/trip/trip.labels'
 import { Button } from '@/components/ui/button'
 
@@ -31,6 +32,8 @@ export function StatisticsPageClient({ itemId }: { itemId: string }) {
             <PrintJobStatisticsClient itemId={itemId} />
           ) : item.data?.type === 'HOME' ? (
             <HomeStatisticsClient itemId={itemId} />
+          ) : item.data?.type === 'CUSTOM' ? (
+            <CustomDomainStatisticsClient itemId={itemId} />
           ) : item.data ? (
             <ReadingStatisticsClient itemId={itemId} itemType={item.data.type} />
           ) : null}

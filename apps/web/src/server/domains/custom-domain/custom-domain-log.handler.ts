@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { FieldType } from '@prisma/client'
+import { FieldType, ChartType, ChartAggregation } from '@prisma/client'
 import { createTRPCRouter, protectedProcedure } from '@/server/trpc'
 import { CustomDomainRepository } from './custom-domain.repository'
 import { CustomDomainLogService } from './custom-domain-log.service'
@@ -122,4 +122,41 @@ export const customDomainLogRouter = createTRPCRouter({
       await makeService(ctx.db).deleteEntry(input.entryId, ctx.userId)
       return { success: true }
     }),
+
+  listCharts: protectedProcedure
+    .input(z.object({ customDomainId: z.string() }))
+    .query(({ ctx, input }) => makeService(ctx.db).listCharts(input.customDomainId, ctx.userId)),
+
+  createChart: protectedProcedure
+    .input(
+      z.object({
+        customDomainId: z.string(),
+        fieldId: z.string(),
+        name: z.string().min(1).max(100),
+        chartType: z.nativeEnum(ChartType),
+        aggregation: z.nativeEnum(ChartAggregation),
+      })
+    )
+    .mutation(({ ctx, input }) => {
+      const { customDomainId, ...data } = input
+      return makeService(ctx.db).createChart(customDomainId, ctx.userId, data)
+    }),
+
+  deleteChart: protectedProcedure
+    .input(z.object({ chartId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      await makeService(ctx.db).deleteChart(input.chartId, ctx.userId)
+      return { success: true }
+    }),
+
+  reorderCharts: protectedProcedure
+    .input(z.object({ customDomainId: z.string(), orderedChartIds: z.array(z.string()) }))
+    .mutation(async ({ ctx, input }) => {
+      await makeService(ctx.db).reorderCharts(input.customDomainId, ctx.userId, input.orderedChartIds)
+      return { success: true }
+    }),
+
+  getStatistics: protectedProcedure
+    .input(z.object({ itemId: z.string() }))
+    .query(({ ctx, input }) => makeService(ctx.db).getStatistics(input.itemId, ctx.userId)),
 })

@@ -107,6 +107,15 @@ export function LogFieldInput({
           required={field.required}
         />
       )
+    case 'TIME':
+      return (
+        <Input
+          type="time"
+          value={(value as string) ?? ''}
+          onChange={(e) => onChange(field.key, (e.target as HTMLInputElement).value)}
+          required={field.required}
+        />
+      )
     case 'BOOLEAN':
       return <Switch checked={(value as boolean) ?? false} onCheckedChange={(v) => onChange(field.key, v)} />
     case 'ENUM':

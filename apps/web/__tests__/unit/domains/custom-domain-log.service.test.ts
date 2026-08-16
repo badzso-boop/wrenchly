@@ -20,6 +20,12 @@ const mockDomainRepo = {
   listPublished: vi.fn(),
   cloneDomain: vi.fn(),
   findItemData: vi.fn(),
+  listCharts: vi.fn(),
+  findChartById: vi.fn(),
+  createChart: vi.fn(),
+  deleteChart: vi.fn(),
+  reorderCharts: vi.fn(),
+  listAllEntriesByItemId: vi.fn(),
 }
 
 const mockItemRepo = {
@@ -222,6 +228,91 @@ describe('CustomDomainLogService.updateEntry: sparse historical data', () => {
 
     expect(mockDomainRepo.applyEntryValueOps).toHaveBeenCalledWith('entry-1', [
       { fieldId: 'field-c', action: 'clear' },
+    ])
+  })
+})
+
+describe('CustomDomainLogService.createChart', () => {
+  it('rejects charting a non-numeric field', async () => {
+    mockDomainRepo.findById.mockResolvedValue({ id: 'domain-1', userId: 'user-1', fields: [] })
+    mockDomainRepo.findFieldWithConfig.mockResolvedValue(
+      numberField({ id: 'field-a', fieldType: 'TEXT', loggable: true })
+    )
+
+    await expect(
+      service.createChart('domain-1', 'user-1', { fieldId: 'field-a', name: 'X', chartType: 'LINE', aggregation: 'LATEST' })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'errors.custom_domain.chart_field_not_numeric' })
+    expect(mockDomainRepo.createChart).not.toHaveBeenCalled()
+  })
+
+  it('rejects charting a non-loggable (Profile-only) field', async () => {
+    mockDomainRepo.findById.mockResolvedValue({ id: 'domain-1', userId: 'user-1', fields: [] })
+    mockDomainRepo.findFieldWithConfig.mockResolvedValue(
+      numberField({ id: 'field-a', fieldType: 'NUMBER', loggable: false })
+    )
+
+    await expect(
+      service.createChart('domain-1', 'user-1', { fieldId: 'field-a', name: 'X', chartType: 'LINE', aggregation: 'LATEST' })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'errors.custom_domain.chart_field_not_loggable' })
+    expect(mockDomainRepo.createChart).not.toHaveBeenCalled()
+  })
+
+  it('creates a chart for a loggable numeric field, ordered after existing charts', async () => {
+    mockDomainRepo.findById.mockResolvedValue({ id: 'domain-1', userId: 'user-1', fields: [] })
+    mockDomainRepo.findFieldWithConfig.mockResolvedValue(
+      numberField({ id: 'field-a', fieldType: 'NUMBER', loggable: true, archivedAt: null })
+    )
+    mockDomainRepo.listCharts.mockResolvedValue([{ id: 'chart-existing' }])
+    mockDomainRepo.createChart.mockResolvedValue({ id: 'chart-1' })
+
+    await service.createChart('domain-1', 'user-1', {
+      fieldId: 'field-a',
+      name: 'Distance over time',
+      chartType: 'LINE',
+      aggregation: 'LATEST',
+    })
+
+    expect(mockDomainRepo.createChart).toHaveBeenCalledWith('domain-1', {
+      fieldId: 'field-a',
+      name: 'Distance over time',
+      chartType: 'LINE',
+      aggregation: 'LATEST',
+      order: 1,
+    })
+  })
+})
+
+describe('CustomDomainLogService.getStatistics', () => {
+  it('computes trend/monthly/total/latest per chart from the item\'s logged entries', async () => {
+    mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1' })
+    mockDomainRepo.findItemData.mockResolvedValue({ itemId: 'item-1', customDomainId: 'domain-1' })
+    mockDomainRepo.listCharts.mockResolvedValue([
+      {
+        id: 'chart-1',
+        fieldId: 'field-a',
+        name: 'Distance',
+        chartType: 'LINE',
+        aggregation: 'SUM',
+        field: { unit: 'km' },
+      },
+    ])
+    mockDomainRepo.listAllEntriesByItemId.mockResolvedValue([
+      { recordedAt: new Date('2026-07-01'), values: [{ fieldId: 'field-a', valueNumber: 5 }] },
+      { recordedAt: new Date('2026-08-02'), values: [{ fieldId: 'field-a', valueNumber: 7 }] },
+      { recordedAt: new Date('2026-08-10'), values: [{ fieldId: 'other-field', valueNumber: 99 }] },
+    ])
+
+    const result = await service.getStatistics('item-1', 'user-1')
+
+    expect(result.entryCount).toBe(3)
+    expect(result.charts).toHaveLength(1)
+    const chart = result.charts[0]!
+    expect(chart.total).toBe(12)
+    expect(chart.latest).toBe(7)
+    expect(chart.trend).toHaveLength(2)
+    expect(chart.monthly).toEqual([
+      { month: '2026-07', total: 5 },
+      { month: '2026-08', total: 7 },
     ])
   })
 })

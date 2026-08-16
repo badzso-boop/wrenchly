@@ -25,6 +25,7 @@ export interface FieldValueValidationConfig {
 }
 
 const SKIPPED: FieldValueValidationResult = { valid: true, value: { column: null, value: undefined } }
+const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/
 
 function isEmpty(rawValue: unknown): boolean {
   return rawValue === undefined || rawValue === null || rawValue === ''
@@ -119,6 +120,13 @@ export function validateFieldValue(
       const d = rawValue instanceof Date ? rawValue : new Date(rawValue as string)
       if (Number.isNaN(d.getTime())) return { valid: false, error: 'errors.custom_domain.invalid_type' }
       return { valid: true, value: { column: 'valueDate', value: d } }
+    }
+
+    case 'TIME': {
+      if (typeof rawValue !== 'string' || !TIME_RE.test(rawValue)) {
+        return { valid: false, error: 'errors.custom_domain.invalid_type' }
+      }
+      return { valid: true, value: { column: 'valueString', value: rawValue } }
     }
 
     case 'ENUM':

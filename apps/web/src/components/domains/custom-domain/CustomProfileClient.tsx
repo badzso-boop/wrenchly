@@ -15,6 +15,7 @@ export const FIELD_TYPE_MAP: Record<FieldType, ProfileFieldType> = {
   TEXT: 'text',
   NUMBER: 'number',
   DATE: 'date',
+  TIME: 'time',
   BOOLEAN: 'boolean',
   ENUM: 'select',
   URL: 'text',

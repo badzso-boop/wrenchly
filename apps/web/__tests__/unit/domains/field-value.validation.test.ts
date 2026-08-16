@@ -173,6 +173,33 @@ describe('validateFieldValue: DATE', () => {
   })
 })
 
+describe('validateFieldValue: TIME', () => {
+  it('accepts a valid HH:mm string', () => {
+    const result = validateFieldValue({ fieldType: 'TIME', options: [] }, null, false, '14:30')
+    expect(result).toEqual({ valid: true, value: { column: 'valueString', value: '14:30' } })
+  })
+
+  it('accepts midnight and the last minute of the day', () => {
+    expect(validateFieldValue({ fieldType: 'TIME', options: [] }, null, false, '00:00').valid).toBe(true)
+    expect(validateFieldValue({ fieldType: 'TIME', options: [] }, null, false, '23:59').valid).toBe(true)
+  })
+
+  it('rejects an hour past 23 or a minute past 59', () => {
+    expect(validateFieldValue({ fieldType: 'TIME', options: [] }, null, false, '24:00').valid).toBe(false)
+    expect(validateFieldValue({ fieldType: 'TIME', options: [] }, null, false, '10:60').valid).toBe(false)
+  })
+
+  it('rejects a non-string value', () => {
+    const result = validateFieldValue({ fieldType: 'TIME', options: [] }, null, false, 1430)
+    expect(result.valid).toBe(false)
+  })
+
+  it('rejects a malformed string', () => {
+    const result = validateFieldValue({ fieldType: 'TIME', options: [] }, null, false, '2:30 PM')
+    expect(result.valid).toBe(false)
+  })
+})
+
 describe('validateFieldValue: ENUM / RADIO', () => {
   for (const fieldType of ['ENUM', 'RADIO'] as const) {
     it(`${fieldType}: accepts a value in options`, () => {
