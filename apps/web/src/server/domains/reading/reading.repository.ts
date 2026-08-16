@@ -1,10 +1,14 @@
 import { type PrismaClient, type ItemReading } from '@prisma/client'
+import { resolveItemAccess } from '../item/item-access.service'
 
 export class ReadingRepository {
   constructor(private db: PrismaClient) {}
 
   async findByIdAndUserId(id: string, userId: string): Promise<ItemReading | null> {
-    return this.db.itemReading.findFirst({ where: { id, userId } })
+    const reading = await this.db.itemReading.findUnique({ where: { id } })
+    if (!reading) return null
+    const access = await resolveItemAccess(this.db, reading.itemId, userId)
+    return access ? reading : null
   }
 
   async findByItemId(
@@ -13,8 +17,10 @@ export class ReadingRepository {
     cursor?: string,
     limit = 20
   ): Promise<ItemReading[]> {
+    const access = await resolveItemAccess(this.db, itemId, userId)
+    if (!access) return []
     return this.db.itemReading.findMany({
-      where: { itemId, userId },
+      where: { itemId },
       orderBy: { recordedAt: 'desc' },
       take: limit,
       ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
@@ -22,8 +28,10 @@ export class ReadingRepository {
   }
 
   async findAllByItemId(itemId: string, userId: string): Promise<ItemReading[]> {
+    const access = await resolveItemAccess(this.db, itemId, userId)
+    if (!access) return []
     return this.db.itemReading.findMany({
-      where: { itemId, userId },
+      where: { itemId },
       orderBy: { recordedAt: 'asc' },
     })
   }

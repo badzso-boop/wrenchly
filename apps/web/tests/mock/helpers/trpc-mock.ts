@@ -9,6 +9,10 @@ type Handler = (input: unknown) => unknown
 const DEFAULT_HANDLERS: Record<string, Handler> = {
   'item.list': () => TEST_ITEMS,
   'item.getById': (input) => TEST_ITEMS.find((i) => i.id === (input as { id: string })?.id) ?? null,
+  'itemCollaborator.getItemSummary': (input) => {
+    const item = TEST_ITEMS.find((i) => i.id === (input as { itemId: string })?.itemId)
+    return item ? { id: item.id, name: item.name, userId: item.userId } : null
+  },
   'item.create': (input) => ({ ...TEST_ITEMS[0], ...(input as object), id: 'mock-new-item', createdAt: new Date().toISOString() }),
   'item.update': (input) => ({ ...TEST_ITEMS[0], ...(input as object) }),
   'item.delete': () => ({ id: 'mock-item-1' }),
@@ -37,8 +41,9 @@ const DEFAULT_HANDLERS: Record<string, Handler> = {
   'notification.markRead': () => TEST_NOTIFICATIONS[0],
   'notification.markAllRead': () => null,
 
-  'user.getMe': () => ({ id: 'mock-user', email: 'e2e@wrenchly.test', name: 'E2E User', locale: 'en', timezone: 'Europe/Budapest', createdAt: '2024-01-01T00:00:00.000Z' }),
+  'user.getMe': () => ({ id: 'mock-user', email: 'e2e@wrenchly.test', name: 'E2E User', username: null, locale: 'en', timezone: 'Europe/Budapest', createdAt: '2024-01-01T00:00:00.000Z' }),
   'user.update': (input) => ({ id: 'mock-user', email: 'e2e@wrenchly.test', ...(input as object) }),
+  'user.updateUsername': (input) => ({ id: 'mock-user', email: 'e2e@wrenchly.test', ...(input as object) }),
   'user.getNotifPref': () => ({ pushEnabled: true, emailEnabled: false, advanceDays: 3, quietHoursFrom: null, quietHoursTo: null, weeklyDigest: false }),
   'user.upsertNotifPref': (input) => input,
   'user.getOrCreateCalendarToken': () => TEST_CALENDAR_TOKEN,

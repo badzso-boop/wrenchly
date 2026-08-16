@@ -2,7 +2,7 @@
 import { api } from '@/lib/trpc/client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { ArrowLeft, Pencil, Bell, FileText, ListChecks } from 'lucide-react'
+import { ArrowLeft, Pencil, Bell, FileText, ListChecks, Users } from 'lucide-react'
 import { getProfileFields } from '@/server/domains/profile/profile.fields'
 import { getExtraTabs } from './item-log-config'
 import { MaintenanceList } from '@/components/domains/maintenance/MaintenanceList'
@@ -57,6 +57,7 @@ export function ItemDetailClient({ itemId }: { itemId: string }) {
     ...getExtraTabs(item.data.type, itemId),
     ...(hasCustomLogFields ? [{ href: `/items/${itemId}/custom-log`, label: 'Log', icon: ListChecks }] : []),
     ...(hasGenericProfile ? [{ href: `/items/${itemId}/profile`, label: 'Profile', icon: FileText }] : []),
+    { href: `/items/${itemId}/collaborators`, label: 'Collaborators', icon: Users },
   ]
 
   return (

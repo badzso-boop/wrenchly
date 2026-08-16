@@ -1,14 +1,20 @@
 import type { PrismaClient, FavoriteMeal } from '@prisma/client'
+import { resolveItemAccess } from '../item/item-access.service'
 
 export class FavoriteMealRepository {
   constructor(private db: PrismaClient) {}
 
   async findByIdAndUserId(id: string, userId: string): Promise<FavoriteMeal | null> {
-    return this.db.favoriteMeal.findFirst({ where: { id, userId } })
+    const meal = await this.db.favoriteMeal.findUnique({ where: { id } })
+    if (!meal) return null
+    const access = await resolveItemAccess(this.db, meal.itemId, userId)
+    return access ? meal : null
   }
 
   async listByItemId(itemId: string, userId: string): Promise<FavoriteMeal[]> {
-    return this.db.favoriteMeal.findMany({ where: { itemId, userId }, orderBy: { name: 'asc' } })
+    const access = await resolveItemAccess(this.db, itemId, userId)
+    if (!access) return []
+    return this.db.favoriteMeal.findMany({ where: { itemId }, orderBy: { name: 'asc' } })
   }
 
   async create(data: { userId: string; itemId: string; name: string; notes: string | null }): Promise<FavoriteMeal> {

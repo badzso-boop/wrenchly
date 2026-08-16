@@ -26,6 +26,33 @@
     "upload": {
       "failed": "Upload failed.",
       "file_too_large": "File size exceeds the allowed limit."
+    },
+    "friend": {
+      "cannot_request_self": "You can't send a friend request to yourself.",
+      "already_friends": "You're already friends with this user.",
+      "request_already_pending": "A friend request is already pending with this user.",
+      "request_not_found": "Friend request not found.",
+      "not_addressee": "Only the recipient can respond to this request.",
+      "not_requester": "Only the sender can cancel this request.",
+      "request_not_pending": "This request has already been responded to.",
+      "not_friends": "You're not friends with this user.",
+      "user_not_found": "No user found with that username."
+    },
+    "household_finance": {
+      "not_home_item": "This is only available for property/home items.",
+      "invalid_category": "Invalid category for this transaction type.",
+      "invalid_paid_by": "The selected person must be the item's owner or an accepted collaborator.",
+      "not_found": "Transaction not found."
+    },
+    "item_collaborator": {
+      "already_owner": "This user already owns the item.",
+      "not_a_friend": "You can only invite accepted friends to collaborate.",
+      "already_collaborator": "This user is already a collaborator on this item.",
+      "invite_already_pending": "An invite is already pending for this user.",
+      "invite_not_found": "Collaboration invite not found.",
+      "not_invitee": "Only the invited user can respond to this invite.",
+      "invite_not_pending": "This invite has already been responded to.",
+      "not_owner": "Only the item owner can do this."
     }
   }
 }

@@ -1,10 +1,14 @@
 import { type PrismaClient, type PrintJob } from '@prisma/client'
+import { resolveItemAccess } from '../item/item-access.service'
 
 export class PrintJobRepository {
   constructor(private db: PrismaClient) {}
 
   async findByIdAndUserId(id: string, userId: string): Promise<PrintJob | null> {
-    return this.db.printJob.findFirst({ where: { id, userId } })
+    const job = await this.db.printJob.findUnique({ where: { id } })
+    if (!job) return null
+    const access = await resolveItemAccess(this.db, job.itemId, userId)
+    return access ? job : null
   }
 
   async findByItemId(
@@ -13,8 +17,10 @@ export class PrintJobRepository {
     cursor?: string,
     limit = 20
   ): Promise<PrintJob[]> {
+    const access = await resolveItemAccess(this.db, itemId, userId)
+    if (!access) return []
     return this.db.printJob.findMany({
-      where: { itemId, userId },
+      where: { itemId },
       orderBy: { startedAt: 'desc' },
       take: limit,
       ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
@@ -22,8 +28,10 @@ export class PrintJobRepository {
   }
 
   async findAllByItemId(itemId: string, userId: string): Promise<PrintJob[]> {
+    const access = await resolveItemAccess(this.db, itemId, userId)
+    if (!access) return []
     return this.db.printJob.findMany({
-      where: { itemId, userId },
+      where: { itemId },
       orderBy: { startedAt: 'asc' },
     })
   }

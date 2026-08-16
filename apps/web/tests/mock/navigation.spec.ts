@@ -58,7 +58,8 @@ test.describe('Navigation & Layout (mock)', () => {
 
   test('settings page shows profile form', async ({ page }) => {
     await page.goto('/settings')
-    await expect(page.getByLabel('Name')).toBeVisible()
+    // exact: true - "Name" is otherwise a substring match of the "Username" label too
+    await expect(page.getByLabel('Name', { exact: true })).toBeVisible()
     await expect(page.getByLabel('Email')).toBeVisible()
     // user.getMe returns name: 'E2E User'
     await expect(page.locator('#name')).toHaveValue('E2E User')

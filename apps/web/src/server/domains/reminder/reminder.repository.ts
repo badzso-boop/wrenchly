@@ -1,4 +1,5 @@
 import { type PrismaClient, type Reminder, type User, type Item } from '@prisma/client'
+import { resolveItemAccess } from '../item/item-access.service'
 
 type ReminderWithRelations = Reminder & { user: User; item: Item }
 
@@ -9,13 +10,19 @@ export class ReminderRepository {
     return this.db.reminder.findUnique({ where: { id } })
   }
 
+  /** Owner OR an ACCEPTED collaborator on the reminder's item. */
   async findByIdAndUserId(id: string, userId: string): Promise<Reminder | null> {
-    return this.db.reminder.findFirst({ where: { id, userId } })
+    const reminder = await this.db.reminder.findUnique({ where: { id } })
+    if (!reminder) return null
+    const access = await resolveItemAccess(this.db, reminder.itemId, userId)
+    return access ? reminder : null
   }
 
   async findByItemId(itemId: string, userId: string): Promise<Reminder[]> {
+    const access = await resolveItemAccess(this.db, itemId, userId)
+    if (!access) return []
     return this.db.reminder.findMany({
-      where: { itemId, userId },
+      where: { itemId },
       orderBy: { createdAt: 'asc' },
     })
   }

@@ -24,6 +24,14 @@
       "title": "Your weekly maintenance digest",
       "intro": "Here's what's coming up this week:",
       "body": "{{count}} maintenance item(s) due this week"
+    },
+    "friend_request_received": {
+      "title": "New friend request",
+      "body": "{{name}} sent you a friend request"
+    },
+    "item_collaboration_invite": {
+      "title": "Collaboration invite",
+      "body": "{{name}} invited you to collaborate on {{itemName}}"
     }
   }
 }

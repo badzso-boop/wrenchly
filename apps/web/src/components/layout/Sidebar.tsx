@@ -2,7 +2,7 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState } from 'react'
-import { LayoutDashboard, Wrench, Package, Bell, Settings, Menu, Blocks, Store, BookMarked, LogOut } from 'lucide-react'
+import { LayoutDashboard, Wrench, Package, Bell, Settings, Menu, Blocks, Store, BookMarked, LogOut, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { api } from '@/lib/trpc/client'
 import { authClient } from '@/lib/auth/client'
@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge'
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/items', label: 'My Items', icon: Wrench },
+  { href: '/friends', label: 'Friends', icon: Users },
   { href: '/inventory', label: 'Inventory', icon: Package },
   { href: '/custom-domains', label: 'Custom Domains', icon: Blocks },
   { href: '/custom-domains/store', label: 'Store', icon: Store },
@@ -45,6 +46,7 @@ function NavLink({ href, label, icon: Icon, unreadCount, isActive }: { href: str
 
 function SidebarContent() {
   const unread = api.notification.countUnread.useQuery(undefined, { refetchInterval: 60_000 })
+  const pendingFriendRequests = api.friend.listPendingReceived.useQuery(undefined, { refetchInterval: 60_000 })
   const pathname = usePathname()
   const router = useRouter()
   const [signingOut, setSigningOut] = useState(false)
@@ -75,7 +77,13 @@ function SidebarContent() {
             key={item.href}
             {...item}
             isActive={item.href === activeHref}
-            unreadCount={item.href === '/notifications' ? (unread.data ?? 0) : undefined}
+            unreadCount={
+              item.href === '/notifications'
+                ? (unread.data ?? 0)
+                : item.href === '/friends'
+                  ? (pendingFriendRequests.data?.length ?? 0)
+                  : undefined
+            }
           />
         ))}
       </nav>
