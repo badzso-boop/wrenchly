@@ -1012,13 +1012,16 @@ model CustomDomainFieldValue {
 }
 
 enum ChartType {
-  LINE // raw trend, one point per logged entry (mirrors reading.fields.ts's 'line')
-  BAR_MONTHLY // sum per calendar month (mirrors reading.fields.ts's 'bar-monthly')
+  LINE // raw trend, one point per logged entry (mirrors reading.fields.ts's 'line') -- NUMBER/DECIMAL/TIME
+  BAR_MONTHLY // sum per calendar month (mirrors reading.fields.ts's 'bar-monthly') -- NUMBER/DECIMAL/TIME/DATE
+  PIE // count of entries per option -- ENUM/RADIO/BOOLEAN/CHECKBOXES
+  BAR_CATEGORY // same count-per-option, as bars instead of a pie -- ENUM/RADIO/BOOLEAN/CHECKBOXES
 }
 
 enum ChartAggregation {
   LATEST // stat tile shows the most recent logged value
   SUM // stat tile shows a running total across every logged entry
+  AVG // stat tile shows the average across every logged entry
 }
 
 // A user-authored equivalent of reading.fields.ts's static MetricDef, since a Custom Domain's

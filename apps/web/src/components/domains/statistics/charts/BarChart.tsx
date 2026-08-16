@@ -34,10 +34,15 @@ export function BarChart({
   data,
   series,
   valueFormatter = (n) => n.toLocaleString(),
+  barColorClass,
 }: {
   data: BarDatum[]
   series: BarSeries[]
   valueFormatter?: (n: number) => string
+  /** Colors each bar by its own datum/index instead of its series -- used for a single-series
+   * category distribution (BAR_CATEGORY) where every bar is its own "category color", unlike a
+   * BAR_MONTHLY trend where every bar shares the series' one color. */
+  barColorClass?: (datum: BarDatum, index: number) => string
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [active, setActive] = useState<ActiveState | null>(null)
@@ -144,7 +149,7 @@ export function BarChart({
                       width={barW}
                       height={Math.max(0, segH)}
                       rx={2}
-                      className={s.colorClass}
+                      className={barColorClass ? barColorClass(d, i) : s.colorClass}
                       opacity={isActive ? 1 : 0.88}
                       pointerEvents="none"
                     />
@@ -168,8 +173,8 @@ export function BarChart({
             <div className="mb-0.5 font-medium">{activeDatum.label}</div>
             {series.map((s) => (
               <div key={s.key} className="flex items-center gap-1.5">
-                <span className={`inline-block h-1.5 w-3 rounded-sm ${s.colorClass}`} />
-                <span className="text-muted-foreground">{s.label}:</span>
+                <span className={`inline-block h-1.5 w-3 rounded-sm ${barColorClass ? barColorClass(activeDatum, active.index) : s.colorClass}`} />
+                {!barColorClass && <span className="text-muted-foreground">{s.label}:</span>}
                 <span className="font-semibold tabular-nums">{valueFormatter(activeDatum.values[s.key] ?? 0)}</span>
               </div>
             ))}

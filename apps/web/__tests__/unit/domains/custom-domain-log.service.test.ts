@@ -26,6 +26,7 @@ const mockDomainRepo = {
   deleteChart: vi.fn(),
   reorderCharts: vi.fn(),
   listAllEntriesByItemId: vi.fn(),
+  findSampleItemForDomain: vi.fn(),
 }
 
 const mockItemRepo = {
@@ -233,7 +234,7 @@ describe('CustomDomainLogService.updateEntry: sparse historical data', () => {
 })
 
 describe('CustomDomainLogService.createChart', () => {
-  it('rejects charting a non-numeric field', async () => {
+  it('rejects a chart type unsupported by the field (e.g. LINE on a TEXT field)', async () => {
     mockDomainRepo.findById.mockResolvedValue({ id: 'domain-1', userId: 'user-1', fields: [] })
     mockDomainRepo.findFieldWithConfig.mockResolvedValue(
       numberField({ id: 'field-a', fieldType: 'TEXT', loggable: true })
@@ -241,8 +242,32 @@ describe('CustomDomainLogService.createChart', () => {
 
     await expect(
       service.createChart('domain-1', 'user-1', { fieldId: 'field-a', name: 'X', chartType: 'LINE', aggregation: 'LATEST' })
-    ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'errors.custom_domain.chart_field_not_numeric' })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'errors.custom_domain.chart_type_not_supported' })
     expect(mockDomainRepo.createChart).not.toHaveBeenCalled()
+  })
+
+  it('rejects PIE on a numeric field (categorical chart types need a categorical field)', async () => {
+    mockDomainRepo.findById.mockResolvedValue({ id: 'domain-1', userId: 'user-1', fields: [] })
+    mockDomainRepo.findFieldWithConfig.mockResolvedValue(
+      numberField({ id: 'field-a', fieldType: 'NUMBER', loggable: true })
+    )
+
+    await expect(
+      service.createChart('domain-1', 'user-1', { fieldId: 'field-a', name: 'X', chartType: 'PIE', aggregation: 'LATEST' })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'errors.custom_domain.chart_type_not_supported' })
+    expect(mockDomainRepo.createChart).not.toHaveBeenCalled()
+  })
+
+  it('accepts PIE on an ENUM field', async () => {
+    mockDomainRepo.findById.mockResolvedValue({ id: 'domain-1', userId: 'user-1', fields: [] })
+    mockDomainRepo.findFieldWithConfig.mockResolvedValue(
+      numberField({ id: 'field-a', fieldType: 'ENUM', loggable: true, options: ['a', 'b'] })
+    )
+    mockDomainRepo.listCharts.mockResolvedValue([])
+    mockDomainRepo.createChart.mockResolvedValue({ id: 'chart-1' })
+
+    await service.createChart('domain-1', 'user-1', { fieldId: 'field-a', name: 'X', chartType: 'PIE', aggregation: 'LATEST' })
+    expect(mockDomainRepo.createChart).toHaveBeenCalled()
   })
 
   it('rejects charting a non-loggable (Profile-only) field', async () => {
@@ -293,7 +318,7 @@ describe('CustomDomainLogService.getStatistics', () => {
         name: 'Distance',
         chartType: 'LINE',
         aggregation: 'SUM',
-        field: { unit: 'km' },
+        field: { unit: 'km', fieldType: 'NUMBER' },
       },
     ])
     mockDomainRepo.listAllEntriesByItemId.mockResolvedValue([
@@ -306,14 +331,74 @@ describe('CustomDomainLogService.getStatistics', () => {
 
     expect(result.entryCount).toBe(3)
     expect(result.charts).toHaveLength(1)
-    const chart = result.charts[0]!
+    const chart = result.charts[0]! as any
+    expect(chart.family).toBe('numeric')
     expect(chart.total).toBe(12)
+    expect(chart.avg).toBe(6)
     expect(chart.latest).toBe(7)
     expect(chart.trend).toHaveLength(2)
     expect(chart.monthly).toEqual([
       { month: '2026-07', total: 5 },
       { month: '2026-08', total: 7 },
     ])
+  })
+
+  it('tallies a count-per-option distribution for a categorical (PIE/BAR_CATEGORY) chart', async () => {
+    mockItemRepo.findByIdAndUserId.mockResolvedValue({ id: 'item-1' })
+    mockDomainRepo.findItemData.mockResolvedValue({ itemId: 'item-1', customDomainId: 'domain-1' })
+    mockDomainRepo.listCharts.mockResolvedValue([
+      {
+        id: 'chart-2',
+        fieldId: 'field-b',
+        name: 'Sport type',
+        chartType: 'PIE',
+        aggregation: 'LATEST',
+        field: { fieldType: 'ENUM' },
+      },
+    ])
+    mockDomainRepo.listAllEntriesByItemId.mockResolvedValue([
+      { recordedAt: new Date('2026-07-01'), values: [{ fieldId: 'field-b', valueString: 'Running' }] },
+      { recordedAt: new Date('2026-07-05'), values: [{ fieldId: 'field-b', valueString: 'Running' }] },
+      { recordedAt: new Date('2026-07-10'), values: [{ fieldId: 'field-b', valueString: 'Swimming' }] },
+    ])
+
+    const result = await service.getStatistics('item-1', 'user-1')
+
+    const chart = result.charts[0]! as any
+    expect(chart.family).toBe('categorical')
+    expect(chart.distribution).toEqual([
+      { label: 'Running', count: 2 },
+      { label: 'Swimming', count: 1 },
+    ])
+    expect(chart.mostCommon).toEqual({ label: 'Running', count: 2 })
+  })
+})
+
+describe('CustomDomainLogService.previewChartData', () => {
+  it('reports hasData: false when the sample item has no logged entries for this field', async () => {
+    mockDomainRepo.findById.mockResolvedValue({ id: 'domain-1', userId: 'user-1', fields: [] })
+    mockDomainRepo.findFieldWithConfig.mockResolvedValue(
+      numberField({ id: 'field-a', fieldType: 'NUMBER' })
+    )
+    mockDomainRepo.findSampleItemForDomain.mockResolvedValue(null)
+
+    const result = await service.previewChartData('domain-1', 'user-1', { fieldId: 'field-a' })
+    expect(result.hasData).toBe(false)
+  })
+
+  it('computes real preview data from the sample item entries when present', async () => {
+    mockDomainRepo.findById.mockResolvedValue({ id: 'domain-1', userId: 'user-1', fields: [] })
+    mockDomainRepo.findFieldWithConfig.mockResolvedValue(
+      numberField({ id: 'field-a', fieldType: 'NUMBER' })
+    )
+    mockDomainRepo.findSampleItemForDomain.mockResolvedValue({ id: 'item-1' })
+    mockDomainRepo.listAllEntriesByItemId.mockResolvedValue([
+      { recordedAt: new Date('2026-07-01'), values: [{ fieldId: 'field-a', valueNumber: 3 }] },
+    ])
+
+    const result = await service.previewChartData('domain-1', 'user-1', { fieldId: 'field-a' })
+    expect(result.hasData).toBe(true)
+    expect(result.numeric?.trend).toEqual([{ date: new Date('2026-07-01'), value: 3 }])
   })
 })
 

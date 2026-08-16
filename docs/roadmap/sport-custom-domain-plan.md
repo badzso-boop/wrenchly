@@ -211,3 +211,73 @@ A `prisma/schema.prisma` módosult (`FieldType.TIME` + `CustomDomainChart` tábl
 de **migráció még nincs generálva/alkalmazva** az éles `wrenchly-db`-n — a repo szabálya szerint
 ehhez kifejezett, erre a konkrét változtatásra vonatkozó jóváhagyás kell tőled, mielőtt bármilyen
 `prisma migrate` parancs fut a live DB ellen.
+
+---
+
+## 3. kör (2026-08-16): kategorikus mezők, PIE chart, "Choose chart" felugró ablak
+
+### Bővített mező-lefedettség
+
+Eddig csak NUMBER/DECIMAL mezőt lehetett charthoz kötni. Most minden loggable mezőtípus
+kap valamilyen chartot, a mező jellegének megfelelőt (`chart-field-compat.ts`, tiszta
+függvények, szerver+kliens közösen importálja):
+
+| Mezőtípus | Elérhető chart típusok | Megjegyzés |
+|---|---|---|
+| NUMBER / DECIMAL | Line, Bar (havi) | mint eddig |
+| TIME | Line | a "HH:mm" percekre konvertálva kerül a Y-tengelyre, a UI visszaformázza; havi *összeg* nem értelmezhető időpontokra, ezért nincs Bar |
+| DATE | Bar (havi) | nem az érték magnitúdóját, hanem a bejegyzés gyakoriságát mutatja (minden bejegyzés 1-gyel járul hozzá a havi összeghez → gyakorlatilag "hányszor logoltad ezt hónaponta") |
+| ENUM / RADIO / BOOLEAN / CHECKBOXES | Pie, Bar (kategóriánként) | opciónkénti darabszám-eloszlás; CHECKBOXES-nál egy bejegyzés több opciót is növelhet |
+
+Aggregáció (stat tile-hoz) is mezőfüggő: NUMBER/DECIMAL → Latest/Total/Average, TIME →
+Latest/Average (Total kihagyva, időpontok összegzése értelmetlen), DATE és kategorikus mezők →
+nincs (a tile automatikusan "leggyakoribb opció" kategorikus chartnál, "bejegyzések száma"
+DATE-nél).
+
+### Új PIE chart komponens
+
+`components/domains/statistics/charts/PieChart.tsx` — ugyanabban a függőségmentes SVG stílusban,
+mint a meglévő `LineChart`/`BarChart` (fix viewBox, hover/tap tooltip, `fill-chart-1..5` színek
+ciklikusan, ld. `chart-colors.ts`). A `BarChart` is kapott egy opcionális `barColorClass` propot,
+hogy kategóriánkénti (nem sorozatonkénti) színezéssel is tudjon renderelni — ez adja a "Bar
+(kategóriánként)" opciót ugyanazzal a komponenssel.
+
+### "Choose chart" felugró ablak (`ChartPickerDialog.tsx`)
+
+Pontosan úgy működik, ahogy kérted: a Log builder egy mezőjének menüjében ("⋮" → "Choose chart",
+csak akkor jelenik meg, ha a mezőtípusnak van egyáltalán chartja) megnyit egy dialógust, ami
+**egyszerre mutatja az összes elérhető grafikontípust** előnézettel:
+
+- Ha a domainnek van már valódi naplózott adata (a Store "sample item" logikáját újrahasznosítva:
+  a felhasználó legrégebbi, ehhez a domainhez csatolt Itemje), a preview **abból** generálódik
+  (`customDomainLog.previewChartData`).
+- Ha nincs still adat, a dialóg egy figyelmeztető sávot ír ki ("No logged entries yet — showing
+  example data"), és **determinisztikusan generált, a mező id-jéből seedelt véletlen adatokkal**
+  mutatja meg, hogyan nézne ki mindegyik grafikontípus — így nem villog újra minden rendereléskor,
+  és azonnal érzékelhető a különbség Line/Bar/Pie között valós adat nélkül is.
+- Kiválasztás után (kártyára kattintás) opcionális név + aggregáció (csak numerikus mezőknél
+  releváns) → mentés a meglévő `createChart` mutationbe.
+
+Ugyanez a dialógus nyílik meg a `ChartBuilder.tsx` "Add chart" gombjából is (előbb egy egyszerű
+mező-választó, utána ugyanaz a dialógus) — egy komponens, két belépési pont, ahogy kérted.
+
+### Backend
+
+- `chart-field-compat.ts` (új, szerver+kliens közös, nulla DB/React függőség):
+  `chartTypesForFieldType`, `aggregationsForFieldType`, `minutesFromTimeString`,
+  `formatMinutesAsTime`.
+- `custom-domain-log.service.ts`: `createChart` validáció mezőtípus-specifikus chart-típus
+  listára cserélve; `getStatistics` két ágra bomlik (`ChartStatsNumeric` / `ChartStatsCategorical`
+  discriminated union); új `previewChartData` (a domain "sample item"-jéből számol, vagy jelzi
+  hogy nincs adat).
+
+### Tesztelés
+
+`pnpm typecheck` tiszta, `pnpm test:unit` **360/360** zöld (új: `chart-field-compat.test.ts` a
+tiszta függvényekre, bővített `custom-domain-log.service.test.ts` a kategorikus statisztikára és
+a preview-ra), `pnpm test:e2e:mock` **44/44** zöld (nincs benne custom-domain-specifikus teszt,
+de a navigáció/dashboard érintett fájlok miatt lefuttattam regresszió-ellenőrzésként).
+
+**Ami ebben a körben is kimaradt** (tudatos scope-vágás, nem hiba): a Store-import még mindig nem
+viszi át a chart-definíciókat (ld. 2. kör); CHECKBOXES chartnál nincs külön "kombináció" nézet
+(minden kiválasztott opció külön számít a Pie-ban, nem a kombinációk gyakorisága).

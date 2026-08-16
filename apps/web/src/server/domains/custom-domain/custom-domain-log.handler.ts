@@ -159,4 +159,11 @@ export const customDomainLogRouter = createTRPCRouter({
   getStatistics: protectedProcedure
     .input(z.object({ itemId: z.string() }))
     .query(({ ctx, input }) => makeService(ctx.db).getStatistics(input.itemId, ctx.userId)),
+
+  previewChartData: protectedProcedure
+    .input(z.object({ customDomainId: z.string(), fieldId: z.string() }))
+    .query(({ ctx, input }) => {
+      const { customDomainId, ...data } = input
+      return makeService(ctx.db).previewChartData(customDomainId, ctx.userId, data)
+    }),
 })

@@ -1,6 +1,6 @@
 import { TRPCError } from '@trpc/server'
 import { format } from 'date-fns'
-import { type FieldType, type ChartType, type ChartAggregation } from '@prisma/client'
+import { type FieldType, type ChartType, type ChartAggregation, type CustomDomainFieldValue, type CustomDomainField } from '@prisma/client'
 import {
   type CustomDomainRepository,
   type CustomDomainWithFields,
@@ -11,23 +11,87 @@ import {
 } from './custom-domain.repository'
 import { type ItemRepository } from '@/server/domains/item/item.repository'
 import { validateFieldValue, type TypedFieldValue } from './field-value.validation'
+import { chartTypesForFieldType, minutesFromTimeString } from './chart-field-compat'
 
-// Fields whose value plots meaningfully on the LINE/BAR_MONTHLY charts (a plain numeric axis) --
-// TEXT/DATE/TIME/ENUM/etc. have no natural y-axis. Kept in sync by hand rather than derived from
-// FieldType's full union, same as this file's other field-type allowlists.
-const CHARTABLE_FIELD_TYPES: FieldType[] = ['NUMBER', 'DECIMAL']
-
-export interface ChartStats {
+export interface ChartStatsNumeric {
+  family: 'numeric'
   id: string
   name: string
   unit: string
   chartType: ChartType
   aggregation: ChartAggregation
+  isTime: boolean
   latest: number | null
   total: number
+  avg: number | null
   monthToDate: number | null
   trend: { date: Date; value: number }[]
   monthly: { month: string; total: number }[]
+}
+
+export interface ChartStatsCategorical {
+  family: 'categorical'
+  id: string
+  name: string
+  chartType: ChartType
+  distribution: { label: string; count: number }[]
+  mostCommon: { label: string; count: number } | null
+  entryCount: number
+}
+
+export type ChartStats = ChartStatsNumeric | ChartStatsCategorical
+
+export interface ChartPreview {
+  hasData: boolean
+  numeric?: { trend: { date: Date; value: number }[]; monthly: { month: string; total: number }[] }
+  categorical?: { distribution: { label: string; count: number }[] }
+}
+
+/** Extracts the plottable numeric value from a logged value row for a numeric-family field --
+ * NUMBER/DECIMAL use their own magnitude, TIME is converted to minutes-since-midnight (so it can
+ * share the same trend/monthly math; the UI formats it back to "HH:mm"), and DATE contributes a
+ * flat 1 per logged entry so "sum per month" naturally becomes "count per month" (a frequency
+ * chart) without any special-cased aggregation path. */
+function numericValueFor(fieldType: FieldType, v: Pick<CustomDomainFieldValue, 'valueNumber' | 'valueString' | 'valueDate'>): number | null {
+  switch (fieldType) {
+    case 'NUMBER':
+    case 'DECIMAL':
+      return v.valueNumber === null ? null : Number(v.valueNumber)
+    case 'TIME':
+      return v.valueString === null ? null : minutesFromTimeString(v.valueString)
+    case 'DATE':
+      return v.valueDate === null ? null : 1
+    default:
+      return null
+  }
+}
+
+/** Extracts the option label(s) a logged value row contributes to a categorical-family field's
+ * distribution -- most field types contribute at most one label, CHECKBOXES can contribute several
+ * (one entry can have multiple boxes ticked, each counted once in the distribution). */
+function categoryLabelsFor(
+  field: Pick<CustomDomainField, 'fieldType'>,
+  v: Pick<CustomDomainFieldValue, 'valueString' | 'valueBoolean' | 'valueJson'>
+): string[] {
+  switch (field.fieldType) {
+    case 'ENUM':
+    case 'RADIO':
+      return v.valueString !== null ? [v.valueString] : []
+    case 'BOOLEAN':
+      return v.valueBoolean !== null ? [v.valueBoolean ? 'Yes' : 'No'] : []
+    case 'CHECKBOXES':
+      return Array.isArray(v.valueJson) ? (v.valueJson as string[]) : []
+    default:
+      return []
+  }
+}
+
+function buildDistribution(labels: string[]): { label: string; count: number }[] {
+  const counts = new Map<string, number>()
+  for (const label of labels) counts.set(label, (counts.get(label) ?? 0) + 1)
+  return Array.from(counts.entries())
+    .sort(([, a], [, b]) => b - a)
+    .map(([label, count]) => ({ label, count }))
 }
 
 function slugifyKey(name: string): string {
@@ -265,8 +329,8 @@ export class CustomDomainLogService {
     if (!field.loggable || field.archivedAt) {
       throw new TRPCError({ code: 'BAD_REQUEST', message: 'errors.custom_domain.chart_field_not_loggable' })
     }
-    if (!CHARTABLE_FIELD_TYPES.includes(field.fieldType)) {
-      throw new TRPCError({ code: 'BAD_REQUEST', message: 'errors.custom_domain.chart_field_not_numeric' })
+    if (!chartTypesForFieldType(field.fieldType).includes(input.chartType)) {
+      throw new TRPCError({ code: 'BAD_REQUEST', message: 'errors.custom_domain.chart_type_not_supported' })
     }
     const existing = await this.domainRepo.listCharts(customDomainId)
     return this.domainRepo.createChart(customDomainId, {
@@ -295,50 +359,118 @@ export class CustomDomainLogService {
     await this.domainRepo.reorderCharts(orderedChartIds)
   }
 
-  /** Computes each configured chart's trend/monthly/total/latest from the item's own logged
-   * entries -- mirrors reading.service.ts's getStatistics almost exactly (same MetricStats
-   * shape, same trend/monthly/total/latest computation), since a Custom Domain chart is just the
-   * user-authored equivalent of that file's static MetricDef. */
+  /** Computes each configured chart's stats from the item's own logged entries -- numeric-family
+   * charts mirror reading.service.ts's getStatistics almost exactly (same trend/monthly/total/
+   * latest computation, plus avg), since a Custom Domain chart is just the user-authored
+   * equivalent of that file's static MetricDef; categorical-family charts instead tally a
+   * count-per-option distribution. */
   async getStatistics(itemId: string, userId: string): Promise<{ charts: ChartStats[]; entryCount: number }> {
     const itemData = await this.assertAttached(itemId, userId)
     const [charts, entries] = await Promise.all([
       this.domainRepo.listCharts(itemData.customDomainId),
       this.domainRepo.listAllEntriesByItemId(itemId),
     ])
-    const currentMonthKey = format(new Date(), 'yyyy-MM')
 
-    const stats: ChartStats[] = charts.map((chart) => {
-      const trend = entries
-        .map((entry) => {
-          const raw = entry.values.find((v) => v.fieldId === chart.fieldId)?.valueNumber
-          return raw === null || raw === undefined ? null : { date: entry.recordedAt, value: Number(raw) }
-        })
-        .filter((p): p is { date: Date; value: number } => p !== null)
-
-      const monthlyMap = new Map<string, number>()
-      for (const p of trend) {
-        const key = format(p.date, 'yyyy-MM')
-        monthlyMap.set(key, (monthlyMap.get(key) ?? 0) + p.value)
-      }
-      const monthly = Array.from(monthlyMap.entries())
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([month, total]) => ({ month, total }))
-
-      return {
-        id: chart.id,
-        name: chart.name,
-        unit: chart.field.unit ?? '',
-        chartType: chart.chartType,
-        aggregation: chart.aggregation,
-        latest: trend.length > 0 ? trend[trend.length - 1]!.value : null,
-        total: trend.reduce((sum, p) => sum + p.value, 0),
-        monthToDate: monthlyMap.get(currentMonthKey) ?? null,
-        trend,
-        monthly,
-      }
-    })
+    const stats: ChartStats[] = charts.map((chart) =>
+      this.computeChartStats(chart, entries.map((e) => ({ recordedAt: e.recordedAt, values: e.values })))
+    )
 
     return { charts: stats, entryCount: entries.length }
+  }
+
+  /** Powers the "Choose chart" dialog's live preview: same computation as getStatistics, but for
+   * a single not-yet-saved (fieldId, chartType) pair against the domain's sample item (the oldest
+   * item the caller has attached to this domain -- reuses the Store's existing "sample data"
+   * concept rather than introducing a second one). Returns `hasData: false` when the sample item
+   * has no logged entries for this field yet, so the dialog knows to fall back to illustrative
+   * random data instead of rendering an empty chart. */
+  async previewChartData(customDomainId: string, userId: string, input: { fieldId: string }): Promise<ChartPreview> {
+    await this.assertDomainOwnership(customDomainId, userId)
+    const field = await this.domainRepo.findFieldWithConfig(input.fieldId)
+    if (!field || field.customDomainId !== customDomainId) {
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'errors.custom_domain.field_not_found' })
+    }
+    const allowedTypes = chartTypesForFieldType(field.fieldType)
+    if (allowedTypes.length === 0) {
+      throw new TRPCError({ code: 'BAD_REQUEST', message: 'errors.custom_domain.chart_type_not_supported' })
+    }
+
+    const sampleItem = await this.domainRepo.findSampleItemForDomain(customDomainId, userId)
+    const entries = sampleItem ? await this.domainRepo.listAllEntriesByItemId(sampleItem.id) : []
+    // The concrete chartType only matters to computeChartStats for its PIE/BAR_CATEGORY vs.
+    // LINE/BAR_MONTHLY branch (categorical vs. numeric) -- any allowed type for this field picks
+    // the right branch, since within a branch every chart type reads the same underlying data
+    // (numeric always computes both trend+monthly; categorical always computes the full
+    // distribution), so one preview query covers every chart type this field can offer.
+    const stats = this.computeChartStats(
+      { id: 'preview', name: 'preview', chartType: allowedTypes[0]!, aggregation: 'LATEST', fieldId: field.id, field },
+      entries.map((e) => ({ recordedAt: e.recordedAt, values: e.values }))
+    )
+
+    if (stats.family === 'numeric') {
+      const hasData = stats.trend.length > 0 || stats.monthly.length > 0
+      return { hasData, numeric: { trend: stats.trend, monthly: stats.monthly } }
+    }
+    return { hasData: stats.distribution.length > 0, categorical: { distribution: stats.distribution } }
+  }
+
+  private computeChartStats(
+    chart: Pick<ChartWithField, 'id' | 'name' | 'chartType' | 'aggregation' | 'fieldId' | 'field'>,
+    entries: { recordedAt: Date; values: Pick<CustomDomainFieldValue, 'fieldId' | 'valueNumber' | 'valueString' | 'valueBoolean' | 'valueDate' | 'valueJson'>[] }[]
+  ): ChartStats {
+    const fieldType = chart.field.fieldType
+
+    if (chart.chartType === 'PIE' || chart.chartType === 'BAR_CATEGORY') {
+      const labels = entries.flatMap((entry) => {
+        const v = entry.values.find((v) => v.fieldId === chart.fieldId)
+        return v ? categoryLabelsFor(chart.field, v) : []
+      })
+      const distribution = buildDistribution(labels)
+      return {
+        family: 'categorical',
+        id: chart.id,
+        name: chart.name,
+        chartType: chart.chartType,
+        distribution,
+        mostCommon: distribution[0] ?? null,
+        entryCount: labels.length,
+      }
+    }
+
+    const currentMonthKey = format(new Date(), 'yyyy-MM')
+    const trend = entries
+      .map((entry) => {
+        const v = entry.values.find((v) => v.fieldId === chart.fieldId)
+        const value = v ? numericValueFor(fieldType, v) : null
+        return value === null ? null : { date: entry.recordedAt, value }
+      })
+      .filter((p): p is { date: Date; value: number } => p !== null)
+
+    const monthlyMap = new Map<string, number>()
+    for (const p of trend) {
+      const key = format(p.date, 'yyyy-MM')
+      monthlyMap.set(key, (monthlyMap.get(key) ?? 0) + p.value)
+    }
+    const monthly = Array.from(monthlyMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([month, total]) => ({ month, total }))
+    const total = trend.reduce((sum, p) => sum + p.value, 0)
+
+    return {
+      family: 'numeric',
+      id: chart.id,
+      name: chart.name,
+      unit: chart.field.unit ?? '',
+      chartType: chart.chartType,
+      aggregation: chart.aggregation,
+      isTime: fieldType === 'TIME',
+      latest: trend.length > 0 ? trend[trend.length - 1]!.value : null,
+      total,
+      avg: trend.length > 0 ? total / trend.length : null,
+      monthToDate: monthlyMap.get(currentMonthKey) ?? null,
+      trend,
+      monthly,
+    }
   }
 
   /** Validates a raw `values` object (keyed by field.key, matching the existing profile-tab
