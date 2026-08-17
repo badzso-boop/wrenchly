@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
+import { getItemIcon } from '@/lib/item-icons'
 
 const FILTERS = [
   { label: 'All', value: undefined },
@@ -15,12 +16,6 @@ const FILTERS = [
   { label: 'Archived', value: 'ARCHIVED' },
   { label: 'Sold', value: 'SOLD' },
 ] as const
-
-const TYPE_ICONS: Record<string, string> = {
-  VEHICLE: '🚗', PROPERTY: '🏠', PLANT: '🌱', MACHINE: '⚙️', TOOL: '🔧',
-  DEVICE: '📱', PET: '🐾', AQUARIUM: '🐠', POOL: '🏊', BOAT: '⛵',
-  DRONE: '🚁', INSTRUMENT: '🎸', BICYCLE: '🚲', SOLAR: '☀️', CUSTOM: '📦',
-}
 
 export function ItemsClient() {
   const [filter, setFilter] = useState<string | undefined>(undefined)
@@ -73,7 +68,7 @@ export function ItemsClient() {
             <Link key={item.id} href={`/items/${item.id}`} className="group block">
               <Card className="transition-all duration-200 hover:shadow-md">
                 <CardContent className="p-4 flex items-center gap-4">
-                  <span className="text-xl shrink-0">{TYPE_ICONS[item.type] ?? '📦'}</span>
+                  <span className="text-xl shrink-0">{getItemIcon(item)}</span>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium group-hover:text-primary transition-colors truncate">{item.name}</p>
                     {(item.brand ?? item.model) && (

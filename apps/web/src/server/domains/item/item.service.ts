@@ -11,7 +11,10 @@ export class ItemService {
     return item
   }
 
-  async list(userId: string, status?: ItemStatus): Promise<Item[]> {
+  async list(
+    userId: string,
+    status?: ItemStatus
+  ): Promise<(Item & { customItemData: { customDomain: { icon: string | null } } | null })[]> {
     return this.itemRepo.findAllByUserId(userId, status)
   }
 
