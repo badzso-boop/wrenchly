@@ -82,3 +82,30 @@ for the full original spec if extending this further.
   script with `chromium.launch()` + `viewport: {width:375,height:667}` against the live site,
   checking `document.documentElement.scrollWidth` vs `clientWidth`, works fine here even without
   Claude in Chrome connected).
+
+- **Every `Select` whose `value` isn't itself the display text needs an explicit `children` render
+  function on `SelectValue`, or the closed trigger shows the raw value (a UUID/id) instead of a
+  label.** This repo's `Select` (`components/ui/select.tsx`) wraps **Base UI**, not Radix — Base
+  UI's `Select.Value` does NOT auto-derive a label from the matching `SelectItem`'s children the
+  way Radix does; without an explicit render prop it just stringifies whatever `value` currently
+  is. Fixing only the `SelectItem` list (the open-dropdown rendering) is not enough — the
+  `SelectValue` (the closed-trigger rendering) is a **separate** piece of JSX that needs its own
+  fix, easy to miss (this exact half-fixed state is what happened in `NewItemClient.tsx`'s
+  CustomDomain picker: the `SelectItem`s were fixed once already, `SelectValue` wasn't, so the bug
+  came back). This has now bitten the friend picker, the cooking linked-expense picker, the paidBy
+  picker (×2), the statistics field picker (`ChartBuilder.tsx`), and the CustomDomain item-creation
+  picker (`NewItemClient.tsx`) — all fixed the same way. Currency/category/type-enum pickers are
+  fine as-is only because their value already equals its own label (e.g. `"VEHICLE"`), so don't
+  "fix" those just for consistency.
+
+  Established pattern to copy (see `AddHouseholdTransactionForm.tsx`'s paidBy picker or
+  `AddCookingLogEntryForm.tsx`'s linked-expense picker for the full version with an empty-value
+  sentinel):
+  ```tsx
+  <SelectValue placeholder="Select…">
+    {(v: string) => optionsArray.find((o) => o.id === v)?.name ?? 'Select…'}
+  </SelectValue>
+  ```
+  Whenever adding a **new** `Select` in this codebase where `value` is an id/UUID (not the label
+  itself), write this render function from the start — don't wait for someone to notice the bug in
+  production.

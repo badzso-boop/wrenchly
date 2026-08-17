@@ -23,7 +23,13 @@ export function MetricField({
       <div className="space-y-1.5">
         <Label htmlFor={id}>{metric.label}</Label>
         <Select value={value || null} onValueChange={(v) => { if (v !== null) onChange(v) }}>
-          <SelectTrigger id={id}><SelectValue placeholder="Select…" /></SelectTrigger>
+          <SelectTrigger id={id}>
+            {/* Base UI's SelectValue shows the raw `value` (the option's numeric
+                code, e.g. 4) unless told how to render a label for it. */}
+            <SelectValue placeholder="Select…">
+              {(v: string) => metric.options?.find((o) => String(o.value) === v)?.label ?? 'Select…'}
+            </SelectValue>
+          </SelectTrigger>
           <SelectContent>
             {metric.options.map((o) => (
               <SelectItem key={o.value} value={String(o.value)}>{o.label}</SelectItem>

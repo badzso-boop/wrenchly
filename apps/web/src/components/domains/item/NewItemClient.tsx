@@ -217,7 +217,14 @@ export function NewItemClient() {
                       ) : myDomains.data && myDomains.data.length > 0 ? (
                         <Select value={customDomainId} onValueChange={(v) => { if (v !== null) setCustomDomainId(v) }}>
                           <SelectTrigger id="custom-domain">
-                            <SelectValue placeholder="Select a domain…" />
+                            {/* Base UI's SelectValue shows the raw `value` (a custom
+                                domain id) unless told how to render a label for it. */}
+                            <SelectValue placeholder="Select a domain…">
+                              {(v: string) => {
+                                const match = myDomains.data?.find((d) => d.id === v)
+                                return match ? `${match.icon ? `${match.icon} ` : ''}${match.name}` : 'Select a domain…'
+                              }}
+                            </SelectValue>
                           </SelectTrigger>
                           <SelectContent>
                             {myDomains.data.map((d) => (
