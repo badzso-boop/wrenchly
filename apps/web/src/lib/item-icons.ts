@@ -1,8 +1,8 @@
 const CUSTOM_FALLBACK_ICON = '📦'
 
 export const ITEM_TYPE_ICONS: Record<string, string> = {
-  VEHICLE: '🚗', PROPERTY: '🏠', PLANT: '🌱', MACHINE: '⚙️', TOOL: '🔧',
-  DEVICE: '📱', PET: '🐾', AQUARIUM: '🐠', POOL: '🏊', BOAT: '⛵',
+  VEHICLE: '🚗', PROPERTY: '🏠', HOME: '🏡', PLANT: '🌱', MACHINE: '⚙️', TOOL: '🔧',
+  DEVICE: '📱', PRINTER_3D: '🖨️', PET: '🐾', AQUARIUM: '🐠', POOL: '🏊', BOAT: '⛵',
   DRONE: '🚁', INSTRUMENT: '🎸', BICYCLE: '🚲', SOLAR: '☀️', CUSTOM: CUSTOM_FALLBACK_ICON,
 }
 
