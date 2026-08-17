@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { GripVertical, MoreVertical, Plus, Archive } from 'lucide-react'
+import { GripVertical, MoreVertical, Plus, Archive, LineChart } from 'lucide-react'
 import {
   DndContext,
   type DragEndEvent,
@@ -29,6 +29,8 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { LOG_FIELD_TYPES, getLogFieldTypeDef } from './custom-log-field-types'
 import { LoggableFieldDialog, type LoggableFieldFormResult } from './LoggableFieldDialog'
+import { ChartPickerDialog } from './ChartPickerDialog'
+import { chartTypesForFieldType } from '@/server/domains/custom-domain/chart-field-compat'
 import type { FieldType } from '@prisma/client'
 import type { FieldWithConfig } from '@/server/domains/custom-domain/custom-domain.repository'
 
@@ -48,6 +50,7 @@ export function CustomLogBuilder({
 }) {
   const utils = api.useUtils()
   const [dialog, setDialog] = useState<{ fieldType: FieldType; existing?: FieldWithConfig } | null>(null)
+  const [chartField, setChartField] = useState<FieldWithConfig | null>(null)
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
@@ -120,6 +123,7 @@ export function CustomLogBuilder({
                   key={field.id}
                   field={field}
                   onConfigure={() => setDialog({ fieldType: field.fieldType, existing: field })}
+                  onChooseChart={chartTypesForFieldType(field.fieldType).length > 0 ? () => setChartField(field) : undefined}
                   onRemove={() => {
                     if (window.confirm(`Remove "${field.name}" from the log form?`)) archive.mutate({ fieldId: field.id })
                   }}
@@ -140,6 +144,14 @@ export function CustomLogBuilder({
           onSaved={handleSaved}
         />
       )}
+
+      <ChartPickerDialog
+        open={!!chartField}
+        onOpenChange={(open) => { if (!open) setChartField(null) }}
+        customDomainId={domain.id}
+        field={chartField}
+        onSaved={() => void utils.customDomainLog.listCharts.invalidate({ customDomainId: domain.id })}
+      />
     </div>
   )
 }
@@ -173,10 +185,12 @@ export function FieldLayoutPreview({ fields }: { fields: Pick<FieldWithConfig, '
 function SortableFieldRow({
   field,
   onConfigure,
+  onChooseChart,
   onRemove,
 }: {
   field: FieldWithConfig
   onConfigure: () => void
+  onChooseChart?: () => void
   onRemove: () => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: field.id })
@@ -211,6 +225,11 @@ function SortableFieldRow({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={onConfigure}>Configure</DropdownMenuItem>
+            {onChooseChart && (
+              <DropdownMenuItem onClick={onChooseChart}>
+                <LineChart className="h-3.5 w-3.5" /> Choose chart
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem variant="destructive" onClick={onRemove}>
               <Archive className="h-3.5 w-3.5" /> Remove
             </DropdownMenuItem>

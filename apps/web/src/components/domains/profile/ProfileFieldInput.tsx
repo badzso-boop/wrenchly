@@ -43,7 +43,8 @@ export function ProfileFieldInput({
           id={field.key}
           type={
             field.type === 'number' || field.type === 'decimal' ? 'number'
-              : field.type === 'date' ? 'date' : 'text'
+              : field.type === 'date' ? 'date'
+              : field.type === 'time' ? 'time' : 'text'
           }
           step={field.type === 'decimal' ? 'any' : undefined}
           value={String(values[field.key] ?? '')}

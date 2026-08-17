@@ -1,17 +1,12 @@
 'use client'
 import { api } from '@/lib/trpc/client'
 import Link from 'next/link'
-import { Plus, ChevronRight } from 'lucide-react'
+import { Plus, ChevronRight, Store } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-
-const TYPE_ICONS: Record<string, string> = {
-  VEHICLE: '🚗', PROPERTY: '🏠', PLANT: '🌱', MACHINE: '⚙️', TOOL: '🔧',
-  DEVICE: '📱', PET: '🐾', AQUARIUM: '🐠', POOL: '🏊', BOAT: '⛵',
-  DRONE: '🚁', INSTRUMENT: '🎸', BICYCLE: '🚲', SOLAR: '☀️', CUSTOM: '📦',
-}
+import { getItemIcon } from '@/lib/item-icons'
 
 export function DashboardClient() {
   const items = api.item.list.useQuery({})
@@ -51,6 +46,25 @@ export function DashboardClient() {
           </div>
         )}
 
+        {!items.isLoading && activeItems.length > 0 && !activeItems.some((i) => i.type === 'CUSTOM') && (
+          <Link href="/custom-domains/store" className="group block mb-6">
+            <Card className="border-dashed transition-colors duration-200 hover:border-primary/50 hover:bg-accent/40">
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className="rounded-lg bg-primary/10 p-2 text-primary">
+                  <Store className="h-5 w-5" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium">Track something we don't cover yet</p>
+                  <p className="text-xs text-muted-foreground">
+                    Browse the Custom Domain Store — import a ready-made tracker (sports, hobbies, collections…) or build your own.
+                  </p>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all duration-150 shrink-0" />
+              </CardContent>
+            </Card>
+          </Link>
+        )}
+
         {activeItems.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
             {activeItems.map((item) => (
@@ -58,7 +72,7 @@ export function DashboardClient() {
                 <Card className="h-full transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 cursor-pointer">
                   <CardContent className="p-5">
                     <div className="flex items-start justify-between mb-3">
-                      <span className="text-2xl">{TYPE_ICONS[item.type] ?? '📦'}</span>
+                      <span className="text-2xl">{getItemIcon(item)}</span>
                       <Badge variant="secondary" className="text-xs capitalize">
                         {item.type.toLowerCase()}
                       </Badge>
@@ -97,7 +111,7 @@ export function DashboardClient() {
                   <Card className="opacity-50 hover:opacity-75 transition-opacity duration-200">
                     <CardContent className="p-4">
                       <div className="flex items-center gap-2">
-                        <span className="text-base">{TYPE_ICONS[item.type] ?? '📦'}</span>
+                        <span className="text-base">{getItemIcon(item)}</span>
                         <span className="font-medium text-sm line-clamp-1">{item.name}</span>
                         <Badge variant="outline" className="ml-auto text-xs capitalize shrink-0">
                           {item.status.toLowerCase()}

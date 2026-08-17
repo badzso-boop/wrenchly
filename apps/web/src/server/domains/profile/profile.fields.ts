@@ -1,6 +1,6 @@
 import type { ItemType } from '@prisma/client'
 
-export type ProfileFieldType = 'text' | 'number' | 'decimal' | 'date' | 'boolean' | 'select'
+export type ProfileFieldType = 'text' | 'number' | 'decimal' | 'date' | 'time' | 'boolean' | 'select'
 
 export interface ProfileFieldDef {
   key: string

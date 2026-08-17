@@ -15,12 +15,16 @@ export class ItemRepository {
   }
 
   /** Items the user owns, PLUS items they're an ACCEPTED collaborator on. */
-  async findAllByUserId(userId: string, status?: ItemStatus): Promise<Item[]> {
+  async findAllByUserId(
+    userId: string,
+    status?: ItemStatus
+  ): Promise<(Item & { customItemData: { customDomain: { icon: string | null } } | null })[]> {
     const ids = await getAccessibleItemIds(this.db, userId)
     if (ids.length === 0) return []
     return this.db.item.findMany({
       where: { id: { in: ids }, ...(status ? { status } : {}) },
       orderBy: { createdAt: 'desc' },
+      include: { customItemData: { select: { customDomain: { select: { icon: true } } } } },
     })
   }
 

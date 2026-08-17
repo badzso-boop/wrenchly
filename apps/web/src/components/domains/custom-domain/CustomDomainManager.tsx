@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 import { CustomLogBuilder } from './CustomLogBuilder'
+import { ChartBuilder } from './ChartBuilder'
 import type { FieldType } from '@prisma/client'
 import type { FieldWithConfig } from '@/server/domains/custom-domain/custom-domain.repository'
 
@@ -20,6 +21,7 @@ const FIELD_TYPES: { value: FieldType; label: string }[] = [
   { value: 'TEXT', label: 'Text' },
   { value: 'NUMBER', label: 'Number' },
   { value: 'DATE', label: 'Date' },
+  { value: 'TIME', label: 'Time' },
   { value: 'BOOLEAN', label: 'Yes / No' },
   { value: 'ENUM', label: 'Choice list' },
   { value: 'URL', label: 'Link' },
@@ -218,6 +220,9 @@ function DomainRow({ domain, onChanged }: { domain: DomainForRow; onChanged: () 
 
           <Separator />
           <CustomLogBuilder domain={domain} onChanged={onChanged} isPublished={isPublished} />
+
+          <Separator />
+          <ChartBuilder customDomainId={domain.id} fields={domain.fields} />
         </div>
       )}
     </div>

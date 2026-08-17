@@ -903,6 +903,7 @@ model CustomDomain {
   fields                CustomDomainField[]
   items                 CustomItemData[]
   customItemDataEntries CustomItemDataEntry[]
+  charts                CustomDomainChart[]
 
   @@index([userId])
   @@index([isPublic])
@@ -927,6 +928,7 @@ model CustomDomainField {
   customDomain CustomDomain             @relation(fields: [customDomainId], references: [id], onDelete: Cascade)
   fieldConfig  CustomDomainFieldConfig?
   fieldValues  CustomDomainFieldValue[]
+  charts       CustomDomainChart[]
 
   @@index([customDomainId])
   @@map("custom_domain_fields")
@@ -957,6 +959,7 @@ enum FieldType {
   DECIMAL
   RADIO
   CHECKBOXES
+  TIME // stored in valueString as "HH:mm" (24h) -- no new column, same reuse as TEXT/ENUM/URL
 }
 
 model CustomItemData {
@@ -992,7 +995,8 @@ model CustomDomainFieldValue {
   id           String    @id @default(cuid())
   entryId      String
   fieldId      String
-  valueString  String? // TEXT/LONG_TEXT/ENUM(dropdown)/RADIO — one of the field's `options` for the latter two
+  valueString  String? // TEXT/LONG_TEXT/ENUM(dropdown)/RADIO/TIME — ENUM/RADIO store one of the
+  // field's `options`; TIME stores a plain "HH:mm" (24h) string, no dedicated column
   valueNumber  Decimal?  @db.Decimal(18, 6) // NUMBER and DECIMAL both use this
   valueBoolean Boolean?
   valueDate    DateTime?
@@ -1005,6 +1009,41 @@ model CustomDomainFieldValue {
   @@unique([entryId, fieldId])
   @@index([fieldId])
   @@map("custom_domain_field_values")
+}
+
+enum ChartType {
+  LINE // raw trend, one point per logged entry (mirrors reading.fields.ts's 'line') -- NUMBER/DECIMAL/TIME
+  BAR_MONTHLY // sum per calendar month (mirrors reading.fields.ts's 'bar-monthly') -- NUMBER/DECIMAL/TIME/DATE
+  PIE // count of entries per option -- ENUM/RADIO/BOOLEAN/CHECKBOXES
+  BAR_CATEGORY // same count-per-option, as bars instead of a pie -- ENUM/RADIO/BOOLEAN/CHECKBOXES
+}
+
+enum ChartAggregation {
+  LATEST // stat tile shows the most recent logged value
+  SUM // stat tile shows a running total across every logged entry
+  AVG // stat tile shows the average across every logged entry
+}
+
+// A user-authored equivalent of reading.fields.ts's static MetricDef, since a Custom Domain's
+// fields aren't known at compile time. One row = one chart on the domain's Log-tab entries,
+// rendered with the same LineChart/BarChart components the built-in item types already use.
+// `fieldId` must point at a loggable NUMBER or DECIMAL field of the same domain (checked in the
+// service layer, not the DB, matching this app's existing validation style).
+model CustomDomainChart {
+  id             String            @id @default(cuid())
+  customDomainId String
+  fieldId        String
+  name           String
+  chartType      ChartType         @default(LINE)
+  aggregation    ChartAggregation  @default(LATEST)
+  order          Int               @default(0)
+  createdAt      DateTime          @default(now())
+
+  customDomain CustomDomain      @relation(fields: [customDomainId], references: [id], onDelete: Cascade)
+  field        CustomDomainField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+
+  @@index([customDomainId])
+  @@map("custom_domain_charts")
 }
 
 // ─── ONBOARDING ──────────────────────────────────────────────────────────────
