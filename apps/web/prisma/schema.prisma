@@ -898,6 +898,9 @@ model CustomDomain {
   publishedAt    DateTime?
   sourceDomainId String? // id of the CustomDomain this was imported/cloned from, if any — plain
   // pointer, deliberately not an enforced FK relation given the existing per-user scoping
+  maintenanceLogEnabled Boolean @default(false) // most custom domains have no physical
+  // maintenance concept — opt-in per domain (wrenchly#27), unlike built-in item types where the
+  // Maintenance tab is always shown
 
   user                  User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   fields                CustomDomainField[]

@@ -114,6 +114,7 @@ interface DomainForRow {
   fields: FieldWithConfig[]
   isPublished: boolean
   publishedAt: Date | null
+  maintenanceLogEnabled: boolean
 }
 
 function DomainRow({ domain, onChanged }: { domain: DomainForRow; onChanged: () => void }) {
@@ -130,6 +131,10 @@ function DomainRow({ domain, onChanged }: { domain: DomainForRow; onChanged: () 
   })
   const publish = api.customDomainLog.publish.useMutation({
     onSuccess: () => { toast.success('Domain published to the store'); onChanged() },
+    onError: (err) => toast.error(err.message),
+  })
+  const setMaintenanceLogEnabled = api.customDomain.setMaintenanceLogEnabled.useMutation({
+    onSuccess: () => onChanged(),
     onError: (err) => toast.error(err.message),
   })
 
@@ -188,6 +193,20 @@ function DomainRow({ domain, onChanged }: { domain: DomainForRow; onChanged: () 
               <Link href="/custom-domains/published" className="underline">My published domains</Link>.
             </p>
           )}
+          <Separator />
+          <div className="flex items-center justify-between">
+            <div>
+              <Label htmlFor={`maintenance-log-${domain.id}`} className="text-sm font-medium">Maintenance Log</Label>
+              <p className="text-xs text-muted-foreground">Show a Maintenance Log tab on items in this domain.</p>
+            </div>
+            <Switch
+              id={`maintenance-log-${domain.id}`}
+              checked={domain.maintenanceLogEnabled}
+              onCheckedChange={(checked) => setMaintenanceLogEnabled.mutate({ id: domain.id, enabled: checked })}
+              disabled={setMaintenanceLogEnabled.isPending}
+            />
+          </div>
+
           <Separator />
           <div className="space-y-2">
             <p className="text-sm font-medium">Profile fields</p>

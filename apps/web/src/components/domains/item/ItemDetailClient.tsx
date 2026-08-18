@@ -29,6 +29,10 @@ export function ItemDetailClient({ itemId }: { itemId: string }) {
     { enabled: item.data?.type === 'CUSTOM' }
   )
   const hasCustomLogFields = !!customItemData.data?.domain?.fields.some((f) => f.loggable && !f.archivedAt)
+  // Built-in item types always get a Maintenance Log; CUSTOM domains opt in per-domain via a
+  // switch in the domain settings (wrenchly#27) since most custom domains have no maintenance
+  // concept at all.
+  const showMaintenanceLog = item.data?.type !== 'CUSTOM' || !!customItemData.data?.domain?.maintenanceLogEnabled
 
   if (item.isLoading) return (
     <div className="flex flex-col h-full">
@@ -52,7 +56,7 @@ export function ItemDetailClient({ itemId }: { itemId: string }) {
   const hasGenericProfile = item.data.type === 'CUSTOM' || getProfileFields(item.data.type) !== null
 
   const tabs: { href: string; label: string; icon?: typeof Bell }[] = [
-    { href: `/items/${itemId}`, label: 'Maintenance' },
+    ...(showMaintenanceLog ? [{ href: `/items/${itemId}`, label: 'Maintenance' }] : []),
     { href: `/items/${itemId}/reminders`, label: 'Reminders', icon: Bell },
     ...getExtraTabs(item.data.type, itemId),
     ...(hasCustomLogFields ? [{ href: `/items/${itemId}/custom-log`, label: 'Log', icon: ListChecks }] : []),
@@ -149,31 +153,33 @@ export function ItemDetailClient({ itemId }: { itemId: string }) {
         </Card>
 
         {/* Maintenance section */}
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-base font-semibold">Maintenance Log</h2>
-            <Button
-              size="sm"
-              variant={showAddForm ? 'secondary' : 'default'}
-              onClick={() => setShowAddForm(!showAddForm)}
-            >
-              {showAddForm ? 'Cancel' : '+ Log Maintenance'}
-            </Button>
-          </div>
-
-          {showAddForm && (
-            <div className="mb-4 animate-in slide-in-from-top-2 duration-200">
-              <AddMaintenanceForm
-                itemId={itemId}
-                itemType={item.data.type}
-                onSuccess={() => { setShowAddForm(false); void records.refetch() }}
-              />
+        {showMaintenanceLog && (
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-base font-semibold">Maintenance Log</h2>
+              <Button
+                size="sm"
+                variant={showAddForm ? 'secondary' : 'default'}
+                onClick={() => setShowAddForm(!showAddForm)}
+              >
+                {showAddForm ? 'Cancel' : '+ Log Maintenance'}
+              </Button>
             </div>
-          )}
 
-          {records.isLoading && <Skeleton className="h-24 rounded-xl" />}
-          {records.data && <MaintenanceList records={records.data} itemType={item.data.type} />}
-        </div>
+            {showAddForm && (
+              <div className="mb-4 animate-in slide-in-from-top-2 duration-200">
+                <AddMaintenanceForm
+                  itemId={itemId}
+                  itemType={item.data.type}
+                  onSuccess={() => { setShowAddForm(false); void records.refetch() }}
+                />
+              </div>
+            )}
+
+            {records.isLoading && <Skeleton className="h-24 rounded-xl" />}
+            {records.data && <MaintenanceList records={records.data} itemType={item.data.type} />}
+          </div>
+        )}
       </div>
     </div>
   )

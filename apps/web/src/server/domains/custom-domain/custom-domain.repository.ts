@@ -51,6 +51,10 @@ export class CustomDomainRepository {
     await this.db.customDomain.delete({ where: { id } })
   }
 
+  async updateMaintenanceLogEnabled(id: string, enabled: boolean): Promise<CustomDomain> {
+    return this.db.customDomain.update({ where: { id }, data: { maintenanceLogEnabled: enabled } })
+  }
+
   async addField(
     customDomainId: string,
     data: {
