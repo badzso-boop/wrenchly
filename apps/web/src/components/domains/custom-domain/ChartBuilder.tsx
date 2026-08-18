@@ -69,7 +69,16 @@ export function ChartBuilder({ customDomainId, fields }: { customDomainId: strin
       ) : pickingField ? (
         <div className="flex items-center gap-2 rounded-lg border p-2">
           <Select value={fieldId} onValueChange={(v) => { if (v !== null) setFieldId(v) }}>
-            <SelectTrigger className="flex-1"><SelectValue placeholder="Pick a field…" /></SelectTrigger>
+            <SelectTrigger className="flex-1">
+              {/* Base UI's SelectValue shows the raw `value` (a field id)
+                  unless told how to render a label for it. */}
+              <SelectValue placeholder="Pick a field…">
+                {(v: string) => {
+                  const match = chartableFields.find((f) => f.id === v)
+                  return match ? `${match.name}${match.unit ? ` (${match.unit})` : ''}` : 'Pick a field…'
+                }}
+              </SelectValue>
+            </SelectTrigger>
             <SelectContent>
               {chartableFields.map((f) => (
                 <SelectItem key={f.id} value={f.id}>{f.name}{f.unit ? ` (${f.unit})` : ''}</SelectItem>

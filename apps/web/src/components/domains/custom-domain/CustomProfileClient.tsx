@@ -71,7 +71,16 @@ function DomainPicker({ itemId }: { itemId: string }) {
       </CardHeader>
       <CardContent className="space-y-4">
         <Select value={selected} onValueChange={(v) => { if (v !== null) setSelected(v) }}>
-          <SelectTrigger><SelectValue placeholder="Select a domain…" /></SelectTrigger>
+          <SelectTrigger>
+            {/* Base UI's SelectValue shows the raw `value` (a custom domain id)
+                unless told how to render a label for it. */}
+            <SelectValue placeholder="Select a domain…">
+              {(v: string) => {
+                const match = domains.data?.find((d) => d.id === v)
+                return match ? `${match.icon ? `${match.icon} ` : ''}${match.name}` : 'Select a domain…'
+              }}
+            </SelectValue>
+          </SelectTrigger>
           <SelectContent>
             {domains.data.map((d) => (
               <SelectItem key={d.id} value={d.id}>{d.icon ? `${d.icon} ` : ''}{d.name}</SelectItem>
