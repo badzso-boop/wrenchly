@@ -1,4 +1,5 @@
 import { type PrismaClient, type TripLog, type TripExpense } from '@prisma/client'
+import { TRPCError } from '@trpc/server'
 import { resolveItemAccess } from '../item/item-access.service'
 
 type TripLogWithChildren = TripLog & { expenses: TripExpense[] }
@@ -63,6 +64,9 @@ export class TripRepository {
       description?: string | null
     }>
   }): Promise<TripLogWithChildren> {
+    const access = await resolveItemAccess(this.db, data.itemId, data.userId)
+    if (!access) throw new TRPCError({ code: 'FORBIDDEN', message: 'errors.item.no_access' })
+
     const { expenses, ...trip } = data
     return this.db.tripLog.create({
       data: {
