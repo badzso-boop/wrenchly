@@ -49,7 +49,7 @@ this project is in Hungarian unless the user switches language first.
   should inherit host ownership) — a generated migration file, a script output, anything. This
   silently blocks `git checkout`/`git pull`/`git mv` with permission-denied unlink errors later.
   Fix before it bites you: `docker run --rm -v <dir>:/mnt node:22-slim chown -R 1000:1000 /mnt`.
-## Friends & Item Collaboration (2026-08-12, PR #23, not yet merged as of writing)
+## Friends & Item Collaboration (2026-08-12, PR #23, merged)
 
 Real multi-user accounts + a friend graph, replacing the old single-owner-only
 model. `FriendRequest` (send/accept/decline/remove, gated on `User.username`
@@ -67,10 +67,15 @@ collaborator) — `paidBy` stays as a legacy display fallback only.
 
 New/changed surface: `/friends` page, `/items/[id]/collaborators` tab,
 `friend`/`itemCollaborator` tRPC routers. Known gaps as of PR #23: no
-Settings UI to set/change your own `username` yet (DB-only), no
-`create()`-path access check yet in the item-scoped domains (tracked as
-[wrenchly#22](https://github.com/badzso-boop/wrenchly/issues/22), pre-existing
-and unrelated to this feature specifically). See `~/wrenchly-friends-and-item-collaboration-prompt.md`
+Settings UI to set/change your own `username` yet (DB-only). The `create()`-path
+IDOR gap ([wrenchly#22](https://github.com/badzso-boop/wrenchly/issues/22)) is fixed
+as of PR #28 — every item-scoped repository's `create()` now also gates on
+`resolveItemAccess(this.db, data.itemId, data.userId)` before inserting, same as the
+read/update/delete paths, throwing `TRPCError({ code: 'FORBIDDEN', message:
+'errors.item.no_access' })` on denial. Deliberately fixed in the repository layer, not
+the service layer, to avoid injecting `db` into every domain service's constructor
+(and touching `router.ts`'s instantiation for each) just for this — see PR #28's
+description for the full reasoning. See `~/wrenchly-friends-and-item-collaboration-prompt.md`
 for the full original spec if extending this further.
 
 - **Mobile viewport check before calling any nav/tab change done.** `ItemDetailClient`'s per-item
@@ -109,3 +114,25 @@ for the full original spec if extending this further.
   Whenever adding a **new** `Select` in this codebase where `value` is an id/UUID (not the label
   itself), write this render function from the start — don't wait for someone to notice the bug in
   production.
+
+## CustomDomain Maintenance Log toggle (2026-08-18, PR #29, not yet merged as of writing)
+
+The Maintenance Log tab is unconditionally shown for every built-in `ItemType`
+(`ItemDetailClient.tsx`'s tab list has always hardcoded it, unlike the other extra tabs which go
+through `item-log-config.ts`'s `ITEM_TYPE_LOG_CONFIG` registry) — that part is untouched.
+`CustomDomain` items previously got it unconditionally too, even though most custom domains have
+no maintenance concept at all ([wrenchly#27](https://github.com/badzso-boop/wrenchly/issues/27)).
+
+Added `CustomDomain.maintenanceLogEnabled Boolean @default(false)` — an opt-in per-domain switch
+in `CustomDomainManager.tsx`'s domain settings panel (`customDomain.setMaintenanceLogEnabled`
+mutation, gated on `assertDomainOwnership` like the other domain-settings mutations).
+`ItemDetailClient.tsx` computes `showMaintenanceLog` (`true` for every non-`CUSTOM` type, or
+`domain.maintenanceLogEnabled` for `CUSTOM` items) and gates both the tab and the Maintenance Log
+section on it.
+
+**PR #29's migration has NOT been applied to the live `wrenchly-db`** — per this file's live-DB
+rule above, that needs your explicit go-ahead as a separate step
+(`docker compose run --rm migrate` after merging), not assumed as part of merging the PR itself.
+Removing the Maintenance tab from any *built-in* item type (the other half of wrenchly#27) is
+intentionally **not** part of this PR — that needs a per-type conversation first, not a unilateral
+call.
