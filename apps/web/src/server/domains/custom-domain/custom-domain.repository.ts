@@ -55,6 +55,14 @@ export class CustomDomainRepository {
     return this.db.customDomain.update({ where: { id }, data: { maintenanceLogEnabled: enabled } })
   }
 
+  async updateReminderEnabled(id: string, enabled: boolean): Promise<CustomDomain> {
+    return this.db.customDomain.update({ where: { id }, data: { reminderEnabled: enabled } })
+  }
+
+  async updateTabOrder(id: string, tabOrder: string[]): Promise<CustomDomain> {
+    return this.db.customDomain.update({ where: { id }, data: { tabOrder } })
+  }
+
   async addField(
     customDomainId: string,
     data: {
