@@ -74,7 +74,7 @@ New/changed surface: `/friends` page, `/items/[id]/collaborators` tab,
 Settings UI to set/change your own `username` yet (DB-only), no
 `create()`-path access check yet in the item-scoped domains (tracked as
 [wrenchly#22](https://github.com/badzso-boop/wrenchly/issues/22), pre-existing
-and unrelated to this feature specifically). See `~/wrenchly-friends-and-item-collaboration-prompt.md`
+and unrelated to this feature specifically). See `~/homelab/docs/archive/wrenchly-friends-and-item-collaboration-prompt.md`
 for the full original spec if extending this further.
 
 - **Mobile viewport check before calling any nav/tab change done.** `ItemDetailClient`'s per-item
