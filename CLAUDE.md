@@ -12,8 +12,12 @@ this project is in Hungarian unless the user switches language first.
   a trivial one-line fix — no direct pushes to `main`. This is the safety net in place of a
   merge-gating CI check and keeps `main` always deployable.
 - **Live database changes require explicit human authorization — no exceptions, no workarounds.**
-  `wrenchly-db` is a real production database with real user data (Norbert's own account among
-  them). Any command that mutates its schema or data — `prisma migrate dev`/`deploy`, `prisma db
+  As of 2026-08-19 the live database is the `wrenchly` database on the homelab server's shared
+  Postgres instance (`homelab-shared-postgres`, `wrenchly_app` user) — NOT the `wrenchly-db`
+  container from `docker-compose.yml`, which is now stopped (kept as a rollback fallback for a
+  safety window, see `~/homelab/SHARED-POSTGRES.md`). It's still a real production database with
+  real user data (Norbert's own account among them). Any command that mutates its schema or
+  data — `prisma migrate dev`/`deploy`, `prisma db
   push`, raw `psql`/SQL against the live container, anything beyond a read-only query — needs the
   human to explicitly say go **for that specific change**, not a standing blanket approval. If a
   permission/safety classifier blocks a DB-mutating command, **stop and ask — do not look for a
@@ -27,7 +31,7 @@ this project is in Hungarian unless the user switches language first.
   unit tests before considering any change done.
 - **Host `pnpm` does not run under this box's installed Node 20** (only `npm`/`node` do) — for
   anything that needs `pnpm` on the host (installing a new dependency, generating a Prisma
-  migration against the live `wrenchly-db` container, which has no host-exposed port), run it
+  migration against the live database, which has no host-exposed port), run it
   inside a throwaway `node:22-slim` container with the repo bind-mounted and joined to the
   compose network, matching the Dockerfile's own builder base image. Don't fight this locally —
   it's a known, worked-around quirk, not a bug to fix.
