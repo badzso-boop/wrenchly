@@ -1,8 +1,16 @@
 services:
+  # profiles: ["standalone"] — csak akkor indul, ha `docker compose --profile
+  # standalone up` fut, ugyanaz a minta, mint a legymernok repóban (PR #55
+  # ott). Ez teszi lehetővé, hogy a homelab szerveren egy közös, több
+  # projektet kiszolgáló Postgres instance-ra álljunk át (lásd
+  # DATABASE_URL/DIRECT_URL override lentebb, ~/homelab/SHARED-POSTGRES.md),
+  # miközben egy friss klónnál `docker compose --profile standalone up`
+  # továbbra is teljesen önmagában felhúzza ezt a saját, lokális DB-t.
   db:
     image: postgres:16-alpine
     container_name: wrenchly-db
     restart: unless-stopped
+    profiles: ["standalone"]
     environment:
       POSTGRES_USER: wrenchly
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wrenchly}
@@ -21,9 +29,10 @@ services:
       target: runner
     container_name: wrenchly
     restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
+    # Nincs explicit depends_on a `db` service-re: profil mögé került (lásd
+    # fent), így profil nélküli indításnál (homelab szerver, közös Postgres
+    # mód) nem is létezne a service, amire mutatna — Compose ilyenkor hibával
+    # elszállna egy definiálatlan service-re mutató depends_on miatt.
     ports:
       - "127.0.0.1:8086:3000"
     env_file:
@@ -31,11 +40,18 @@ services:
     environment:
       # Auth (Better Auth) now owns the users table directly, so Postgres no longer needs
       # to be Supabase — defaults to the local `db` service above. Override in .env to point
-      # at a managed Postgres instead (Supabase, Neon, RDS, ...).
+      # at a managed Postgres instead (Supabase, Neon, RDS, ...), or at the homelab server's
+      # shared instance — see ~/homelab/SHARED-POSTGRES.md.
       DATABASE_URL: ${DATABASE_URL:-postgresql://wrenchly:${POSTGRES_PASSWORD:-wrenchly}@db:5432/wrenchly}
       DIRECT_URL: ${DIRECT_URL:-postgresql://wrenchly:${POSTGRES_PASSWORD:-wrenchly}@db:5432/wrenchly}
+    networks:
+      - default
+      # Csak akkor releváns, ha a homelab szerver közös Postgres instance-ára
+      # kötünk — standalone módban csatlakozva marad, de nem használjuk.
+      - shared-db-net
     labels:
       # Replaces Vercel's vercel.json crons — ofelia below calls these on the same schedule.
+      ofelia-group: "wrenchly"
       ofelia.enabled: "true"
       ofelia.job-exec.reminders.schedule: "0 0 6 * * *"
       ofelia.job-exec.reminders.command: "wget -qO- --header=\"Authorization: Bearer ${CRON_SECRET}\" http://localhost:3000/api/cron/reminders"
@@ -51,12 +67,16 @@ services:
       context: .
       target: migrator
     profiles: ["tools"]
-    depends_on:
-      db:
-        condition: service_healthy
+    # Nincs explicit depends_on a `db` service-re — lásd a `wrenchly`
+    # service-nél lévő megjegyzést ugyanerről (a `db` profil mögé került,
+    # `migrate` a `tools` profillal fut standalone módban is a `standalone`
+    # profil nélkül, ilyenkor a `db`-re mutató depends_on érvénytelen lenne).
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql://wrenchly:${POSTGRES_PASSWORD:-wrenchly}@db:5432/wrenchly}
       DIRECT_URL: ${DIRECT_URL:-postgresql://wrenchly:${POSTGRES_PASSWORD:-wrenchly}@db:5432/wrenchly}
+    networks:
+      - default
+      - shared-db-net
 
   ofelia:
     image: mcuadros/ofelia:latest
@@ -64,11 +84,26 @@ services:
     restart: unless-stopped
     depends_on:
       - wrenchly
-    command: daemon --docker
+    # --docker-filter scopes this Ofelia instance to only containers labeled
+    # ofelia-group=wrenchly — without it, Ofelia's docker-label discovery is
+    # host-wide and would pick up every ofelia.enabled=true container on the
+    # box, including other projects' own Ofelia jobs (confirmed with the
+    # homelab shared-Postgres backup job during the legymernok migration) —
+    # a duplicate-execution risk.
+    command: daemon --docker --docker-filter=label=ofelia-group=wrenchly
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     env_file:
       - .env
+
+networks:
+  default:
+  # A homelab szerver közös, több projektet kiszolgáló Postgres instance-ának
+  # hálózata — csak akkor releváns, ha a DATABASE_URL/DIRECT_URL a .env-ben a
+  # közösre van átírva. Standalone módban létezik, de nincs mit elérnie
+  # rajta. Előfeltétel: `docker network create shared-db-net`.
+  shared-db-net:
+    external: true
 
 volumes:
   db_data:
