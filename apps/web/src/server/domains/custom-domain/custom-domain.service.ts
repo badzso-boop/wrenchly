@@ -48,6 +48,11 @@ export class CustomDomainService {
     }
   }
 
+  async setMaintenanceLogEnabled(id: string, userId: string, enabled: boolean): Promise<void> {
+    await this.assertDomainOwnership(id, userId)
+    await this.domainRepo.updateMaintenanceLogEnabled(id, enabled)
+  }
+
   async addField(
     customDomainId: string,
     userId: string,

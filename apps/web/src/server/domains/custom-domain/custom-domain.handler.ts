@@ -26,6 +26,14 @@ export const customDomainRouter = createTRPCRouter({
       return { success: true }
     }),
 
+  setMaintenanceLogEnabled: protectedProcedure
+    .input(z.object({ id: z.string(), enabled: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      const service = new CustomDomainService(new CustomDomainRepository(ctx.db), new ItemRepository(ctx.db))
+      await service.setMaintenanceLogEnabled(input.id, ctx.userId, input.enabled)
+      return { success: true }
+    }),
+
   addField: protectedProcedure
     .input(
       z.object({
