@@ -1,4 +1,5 @@
 import { type PrismaClient, type PrintJob } from '@prisma/client'
+import { TRPCError } from '@trpc/server'
 import { resolveItemAccess } from '../item/item-access.service'
 
 export class PrintJobRepository {
@@ -46,6 +47,9 @@ export class PrintJobRepository {
     success: boolean
     notes?: string | null
   }): Promise<PrintJob> {
+    const access = await resolveItemAccess(this.db, data.itemId, data.userId)
+    if (!access) throw new TRPCError({ code: 'FORBIDDEN', message: 'errors.item.no_access' })
+
     return this.db.printJob.create({ data })
   }
 

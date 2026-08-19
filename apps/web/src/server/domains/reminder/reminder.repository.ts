@@ -1,4 +1,5 @@
 import { type PrismaClient, type Reminder, type User, type Item } from '@prisma/client'
+import { TRPCError } from '@trpc/server'
 import { resolveItemAccess } from '../item/item-access.service'
 
 type ReminderWithRelations = Reminder & { user: User; item: Item }
@@ -76,6 +77,9 @@ export class ReminderRepository {
     triggerConfig: Record<string, unknown>
     nextTriggerAt?: Date | null
   }): Promise<Reminder> {
+    const access = await resolveItemAccess(this.db, data.itemId, data.userId)
+    if (!access) throw new TRPCError({ code: 'FORBIDDEN', message: 'errors.item.no_access' })
+
     return this.db.reminder.create({ data: data as Parameters<typeof this.db.reminder.create>[0]['data'] })
   }
 

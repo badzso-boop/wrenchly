@@ -1,5 +1,6 @@
 import { type PrismaClient, type MaintenanceRecord, type Part } from '@prisma/client'
 import { format } from 'date-fns'
+import { TRPCError } from '@trpc/server'
 import { resolveItemAccess } from '../item/item-access.service'
 
 type MaintenanceRecordWithParts = MaintenanceRecord & { parts: Part[] }
@@ -57,6 +58,9 @@ export class MaintenanceRepository {
       totalPrice?: number | null
     }>
   }): Promise<MaintenanceRecordWithParts> {
+    const access = await resolveItemAccess(this.db, data.itemId, data.userId)
+    if (!access) throw new TRPCError({ code: 'FORBIDDEN', message: 'errors.item.no_access' })
+
     const { parts, ...record } = data
     return this.db.maintenanceRecord.create({
       data: {

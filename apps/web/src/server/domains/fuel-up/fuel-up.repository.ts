@@ -1,4 +1,5 @@
 import type { PrismaClient, FuelUp } from '@prisma/client'
+import { TRPCError } from '@trpc/server'
 import { resolveItemAccess } from '../item/item-access.service'
 
 export type FuelUpWithTrips = FuelUp & {
@@ -77,6 +78,9 @@ export class FuelUpRepository {
     notes?: string | null
     tripIds?: string[]
   }): Promise<FuelUpWithTrips> {
+    const access = await resolveItemAccess(this.db, data.itemId, data.userId)
+    if (!access) throw new TRPCError({ code: 'FORBIDDEN', message: 'errors.item.no_access' })
+
     const { tripIds, ...fuelUp } = data
     return this.db.fuelUp.create({
       data: {

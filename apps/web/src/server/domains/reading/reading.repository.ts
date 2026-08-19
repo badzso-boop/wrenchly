@@ -1,4 +1,5 @@
 import { type PrismaClient, type ItemReading } from '@prisma/client'
+import { TRPCError } from '@trpc/server'
 import { resolveItemAccess } from '../item/item-access.service'
 
 export class ReadingRepository {
@@ -43,6 +44,9 @@ export class ReadingRepository {
     metrics: Record<string, number>
     notes?: string | null
   }): Promise<ItemReading> {
+    const access = await resolveItemAccess(this.db, data.itemId, data.userId)
+    if (!access) throw new TRPCError({ code: 'FORBIDDEN', message: 'errors.item.no_access' })
+
     return this.db.itemReading.create({
       data: data as Parameters<typeof this.db.itemReading.create>[0]['data'],
     })
