@@ -901,6 +901,10 @@ model CustomDomain {
   maintenanceLogEnabled Boolean @default(false) // most custom domains have no physical
   // maintenance concept — opt-in per domain (wrenchly#27), unlike built-in item types where the
   // Maintenance tab is always shown
+  reminderEnabled Boolean @default(true) // opt-out per domain — Reminders is always shown today,
+  // so the default preserves that behavior for existing domains
+  tabOrder String[] @default([]) // ordered subset of tab keys (maintenance/reminders/log/
+  // statistics/profile/collaborators); empty means "use the built-in default order"
 
   user                  User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   fields                CustomDomainField[]
