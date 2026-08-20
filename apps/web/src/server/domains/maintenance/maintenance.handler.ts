@@ -8,7 +8,9 @@ const PartInputSchema = z.object({
   category: z.string().optional(),
   quantity: z.number().positive(),
   unit: z.string().min(1),
-  unitPrice: z.number().nonnegative().optional(),
+  // Allows negative values on purpose -- a discount/kedvezmeny line item is
+  // entered as a negative unitPrice so it subtracts from costTotal's sum.
+  unitPrice: z.number().optional(),
 })
 
 export const maintenanceRouter = createTRPCRouter({
