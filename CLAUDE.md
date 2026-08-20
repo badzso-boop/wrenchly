@@ -12,8 +12,12 @@ this project is in Hungarian unless the user switches language first.
   a trivial one-line fix — no direct pushes to `main`. This is the safety net in place of a
   merge-gating CI check and keeps `main` always deployable.
 - **Live database changes require explicit human authorization — no exceptions, no workarounds.**
-  `wrenchly-db` is a real production database with real user data (Norbert's own account among
-  them). Any command that mutates its schema or data — `prisma migrate dev`/`deploy`, `prisma db
+  As of 2026-08-19 the live database is the `wrenchly` database on the homelab server's shared
+  Postgres instance (`homelab-shared-postgres`, `wrenchly_app` user) — NOT the `wrenchly-db`
+  container from `docker-compose.yml`, which is now stopped (kept as a rollback fallback for a
+  safety window, see `~/homelab/SHARED-POSTGRES.md`). It's still a real production database with
+  real user data (Norbert's own account among them). Any command that mutates its schema or
+  data — `prisma migrate dev`/`deploy`, `prisma db
   push`, raw `psql`/SQL against the live container, anything beyond a read-only query — needs the
   human to explicitly say go **for that specific change**, not a standing blanket approval. If a
   permission/safety classifier blocks a DB-mutating command, **stop and ask — do not look for a
@@ -27,7 +31,7 @@ this project is in Hungarian unless the user switches language first.
   unit tests before considering any change done.
 - **Host `pnpm` does not run under this box's installed Node 20** (only `npm`/`node` do) — for
   anything that needs `pnpm` on the host (installing a new dependency, generating a Prisma
-  migration against the live `wrenchly-db` container, which has no host-exposed port), run it
+  migration against the live database, which has no host-exposed port), run it
   inside a throwaway `node:22-slim` container with the repo bind-mounted and joined to the
   compose network, matching the Dockerfile's own builder base image. Don't fight this locally —
   it's a known, worked-around quirk, not a bug to fix.
@@ -75,7 +79,7 @@ read/update/delete paths, throwing `TRPCError({ code: 'FORBIDDEN', message:
 'errors.item.no_access' })` on denial. Deliberately fixed in the repository layer, not
 the service layer, to avoid injecting `db` into every domain service's constructor
 (and touching `router.ts`'s instantiation for each) just for this — see PR #28's
-description for the full reasoning. See `~/wrenchly-friends-and-item-collaboration-prompt.md`
+description for the full reasoning. See `~/homelab/docs/archive/wrenchly-friends-and-item-collaboration-prompt.md`
 for the full original spec if extending this further.
 
 - **Mobile viewport check before calling any nav/tab change done.** `ItemDetailClient`'s per-item
@@ -115,7 +119,7 @@ for the full original spec if extending this further.
   itself), write this render function from the start — don't wait for someone to notice the bug in
   production.
 
-## CustomDomain Maintenance Log toggle (2026-08-18, PR #29, not yet merged as of writing)
+## CustomDomain Maintenance Log toggle (2026-08-18, PR #29, merged)
 
 The Maintenance Log tab is unconditionally shown for every built-in `ItemType`
 (`ItemDetailClient.tsx`'s tab list has always hardcoded it, unlike the other extra tabs which go
@@ -130,9 +134,9 @@ mutation, gated on `assertDomainOwnership` like the other domain-settings mutati
 `domain.maintenanceLogEnabled` for `CUSTOM` items) and gates both the tab and the Maintenance Log
 section on it.
 
-**PR #29's migration has NOT been applied to the live `wrenchly-db`** — per this file's live-DB
-rule above, that needs your explicit go-ahead as a separate step
-(`docker compose run --rm migrate` after merging), not assumed as part of merging the PR itself.
-Removing the Maintenance tab from any *built-in* item type (the other half of wrenchly#27) is
+PR #29's migration (`20260818153000_add_custom_domain_maintenance_log_toggle`) is included in
+`schema.prisma` on `main` and has already been applied to the live database as part of that PR's
+own merge/deploy — no separate migration step is needed for this docs-only change. Removing the
+Maintenance tab from any *built-in* item type (the other half of wrenchly#27) is
 intentionally **not** part of this PR — that needs a per-type conversation first, not a unilateral
 call.

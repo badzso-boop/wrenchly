@@ -33,15 +33,15 @@ function mockDb() {
   return {
     item: { findUnique: vi.fn(), findMany: vi.fn() },
     itemCollaborator: { findUnique: vi.fn(), findMany: vi.fn() },
-    maintenanceRecord: { findUnique: vi.fn(), findMany: vi.fn() },
-    tripLog: { findUnique: vi.fn(), findMany: vi.fn() },
-    fuelUp: { findUnique: vi.fn(), findMany: vi.fn() },
-    itemReading: { findUnique: vi.fn(), findMany: vi.fn() },
-    printJob: { findUnique: vi.fn(), findMany: vi.fn() },
-    householdTransaction: { findUnique: vi.fn(), findMany: vi.fn() },
-    cookingLogEntry: { findUnique: vi.fn(), findMany: vi.fn() },
-    favoriteMeal: { findUnique: vi.fn(), findMany: vi.fn() },
-    reminder: { findUnique: vi.fn(), findMany: vi.fn() },
+    maintenanceRecord: { findUnique: vi.fn(), findMany: vi.fn(), create: vi.fn().mockResolvedValue({}) },
+    tripLog: { findUnique: vi.fn(), findMany: vi.fn(), create: vi.fn().mockResolvedValue({}) },
+    fuelUp: { findUnique: vi.fn(), findMany: vi.fn(), create: vi.fn().mockResolvedValue({}) },
+    itemReading: { findUnique: vi.fn(), findMany: vi.fn(), create: vi.fn().mockResolvedValue({}) },
+    printJob: { findUnique: vi.fn(), findMany: vi.fn(), create: vi.fn().mockResolvedValue({}) },
+    householdTransaction: { findUnique: vi.fn(), findMany: vi.fn(), create: vi.fn().mockResolvedValue({}) },
+    cookingLogEntry: { findUnique: vi.fn(), findMany: vi.fn(), create: vi.fn().mockResolvedValue({}) },
+    favoriteMeal: { findUnique: vi.fn(), findMany: vi.fn(), create: vi.fn().mockResolvedValue({}) },
+    reminder: { findUnique: vi.fn(), findMany: vi.fn(), create: vi.fn().mockResolvedValue({}) },
     customItemDataEntry: { findUnique: vi.fn(), findMany: vi.fn() },
   }
 }
@@ -167,6 +167,128 @@ describe('CustomDomainRepository.findEntryByIdAndUserId', () => {
   it('denies access to an unrelated user', async () => {
     wireItemAccess(db, STRANGER)
     expect(await repo.findEntryByIdAndUserId('entry-1', STRANGER)).toBeNull()
+  })
+})
+
+// wrenchly#22: create() must gate on resolveItemAccess just like the read paths above — a
+// caller who knows/guesses another user's itemId must not be able to insert a child record
+// against it (IDOR).
+type CreateCase = {
+  name: string
+  build: (db: any) => { create: (data: any) => Promise<unknown> }
+  data: (userId: string) => Record<string, unknown>
+}
+
+const createCases: CreateCase[] = [
+  {
+    name: 'MaintenanceRepository',
+    build: (db) => new MaintenanceRepository(db),
+    data: (userId) => ({ userId, itemId: ITEM_ID, title: 'Oil change', category: 'OIL', performedAt: new Date() }),
+  },
+  {
+    name: 'TripRepository',
+    build: (db) => new TripRepository(db),
+    data: (userId) => ({
+      userId,
+      itemId: ITEM_ID,
+      startedAt: new Date(),
+      startOdometer: 0,
+      distanceKm: 10,
+      endOdometer: 10,
+      totalExpenseCost: 0,
+    }),
+  },
+  {
+    name: 'FuelUpRepository',
+    build: (db) => new FuelUpRepository(db),
+    data: (userId) => ({
+      userId,
+      itemId: ITEM_ID,
+      occurredAt: new Date(),
+      quantity: 10,
+      unit: 'L',
+      isFullTank: true,
+      pricePerUnit: 1,
+      totalPaid: 10,
+      currency: 'EUR',
+    }),
+  },
+  {
+    name: 'ReadingRepository',
+    build: (db) => new ReadingRepository(db),
+    data: (userId) => ({ userId, itemId: ITEM_ID, recordedAt: new Date(), metrics: {} }),
+  },
+  {
+    name: 'PrintJobRepository',
+    build: (db) => new PrintJobRepository(db),
+    data: (userId) => ({ userId, itemId: ITEM_ID, startedAt: new Date(), filamentGrams: 10, materialType: 'PLA', success: true }),
+  },
+  {
+    name: 'HouseholdFinanceRepository',
+    build: (db) => new HouseholdFinanceRepository(db),
+    data: (userId) => ({
+      userId,
+      itemId: ITEM_ID,
+      type: 'EXPENSE',
+      amount: 10,
+      currency: 'EUR',
+      category: null,
+      paidByUserId: userId,
+      store: null,
+      description: null,
+      occurredAt: new Date(),
+    }),
+  },
+  {
+    name: 'CookingRepository',
+    build: (db) => new CookingRepository(db),
+    data: (userId) => ({
+      userId,
+      itemId: ITEM_ID,
+      name: 'Dinner',
+      ingredients: null,
+      servings: null,
+      daysCovered: null,
+      cost: null,
+      currency: 'EUR',
+      linkedTransactionId: null,
+      cookedAt: new Date(),
+    }),
+  },
+  {
+    name: 'FavoriteMealRepository',
+    build: (db) => new FavoriteMealRepository(db),
+    data: (userId) => ({ userId, itemId: ITEM_ID, name: 'Pasta', notes: null }),
+  },
+  {
+    name: 'ReminderRepository',
+    build: (db) => new ReminderRepository(db),
+    data: (userId) => ({ userId, itemId: ITEM_ID, title: 'Check oil', triggerType: 'DATE', triggerConfig: {} }),
+  },
+]
+
+describe.each(createCases)('$name.create', ({ build, data }) => {
+  let db: ReturnType<typeof mockDb>
+  let repo: { create: (data: any) => Promise<unknown> }
+
+  beforeEach(() => {
+    db = mockDb()
+    repo = build(db)
+  })
+
+  it('allows the owner to create a record', async () => {
+    wireItemAccess(db, OWNER)
+    await expect(repo.create(data(OWNER))).resolves.toBeDefined()
+  })
+
+  it('allows an ACCEPTED collaborator to create a record', async () => {
+    wireItemAccess(db, COLLABORATOR)
+    await expect(repo.create(data(COLLABORATOR))).resolves.toBeDefined()
+  })
+
+  it('rejects an unrelated user with FORBIDDEN (IDOR)', async () => {
+    wireItemAccess(db, STRANGER)
+    await expect(repo.create(data(STRANGER))).rejects.toMatchObject({ code: 'FORBIDDEN' })
   })
 })
 

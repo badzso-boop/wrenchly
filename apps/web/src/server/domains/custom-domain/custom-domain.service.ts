@@ -3,6 +3,16 @@ import { Prisma, type FieldType } from '@prisma/client'
 import { type CustomDomainRepository, type CustomDomainWithFields } from './custom-domain.repository'
 import { type ItemRepository } from '@/server/domains/item/item.repository'
 
+export const TAB_KEYS = [
+  'maintenance',
+  'reminders',
+  'log',
+  'statistics',
+  'profile',
+  'collaborators',
+] as const
+export type TabKey = (typeof TAB_KEYS)[number]
+
 function slugifyKey(name: string): string {
   const words = name
     .trim()
@@ -46,6 +56,28 @@ export class CustomDomainService {
       }
       throw err
     }
+  }
+
+  async setMaintenanceLogEnabled(id: string, userId: string, enabled: boolean): Promise<void> {
+    await this.assertDomainOwnership(id, userId)
+    await this.domainRepo.updateMaintenanceLogEnabled(id, enabled)
+  }
+
+  async setReminderEnabled(id: string, userId: string, enabled: boolean): Promise<void> {
+    await this.assertDomainOwnership(id, userId)
+    await this.domainRepo.updateReminderEnabled(id, enabled)
+  }
+
+  async setTabOrder(id: string, userId: string, tabOrder: TabKey[]): Promise<void> {
+    await this.assertDomainOwnership(id, userId)
+    const seen = new Set<string>()
+    for (const key of tabOrder) {
+      if (!TAB_KEYS.includes(key) || seen.has(key)) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'errors.custom_domain.invalid_tab_order' })
+      }
+      seen.add(key)
+    }
+    await this.domainRepo.updateTabOrder(id, tabOrder)
   }
 
   async addField(

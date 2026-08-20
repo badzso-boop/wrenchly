@@ -1,4 +1,5 @@
 import type { PrismaClient, HouseholdTransaction, HouseholdTransactionType, Prisma } from '@prisma/client'
+import { TRPCError } from '@trpc/server'
 import { resolveItemAccess } from '../item/item-access.service'
 
 export interface HouseholdFinanceListFilters {
@@ -68,6 +69,9 @@ export class HouseholdFinanceRepository {
     description: string | null
     occurredAt: Date
   }): Promise<HouseholdTransaction> {
+    const access = await resolveItemAccess(this.db, data.itemId, data.userId)
+    if (!access) throw new TRPCError({ code: 'FORBIDDEN', message: 'errors.item.no_access' })
+
     // paidBy (the legacy free-text field) is intentionally left unset for
     // new rows going forward — paidByUserId is the real attribution now.
     return this.db.householdTransaction.create({ data })

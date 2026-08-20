@@ -16,6 +16,7 @@ import { CustomLogBuilder } from './CustomLogBuilder'
 import { ChartBuilder } from './ChartBuilder'
 import type { FieldType } from '@prisma/client'
 import type { FieldWithConfig } from '@/server/domains/custom-domain/custom-domain.repository'
+import type { TabKey } from '@/server/domains/custom-domain/custom-domain.service'
 
 const FIELD_TYPES: { value: FieldType; label: string }[] = [
   { value: 'TEXT', label: 'Text' },
@@ -114,7 +115,20 @@ interface DomainForRow {
   fields: FieldWithConfig[]
   isPublished: boolean
   publishedAt: Date | null
+  maintenanceLogEnabled: boolean
+  reminderEnabled: boolean
+  tabOrder: string[]
 }
+
+const TAB_LABELS: Record<string, string> = {
+  maintenance: 'Maintenance',
+  reminders: 'Reminders',
+  log: 'Log',
+  statistics: 'Statistics',
+  profile: 'Profile',
+  collaborators: 'Collaborators',
+}
+const DEFAULT_TAB_ORDER: TabKey[] = ['maintenance', 'reminders', 'log', 'statistics', 'profile', 'collaborators']
 
 function DomainRow({ domain, onChanged }: { domain: DomainForRow; onChanged: () => void }) {
   const [expanded, setExpanded] = useState(false)
@@ -132,6 +146,26 @@ function DomainRow({ domain, onChanged }: { domain: DomainForRow; onChanged: () 
     onSuccess: () => { toast.success('Domain published to the store'); onChanged() },
     onError: (err) => toast.error(err.message),
   })
+  const setMaintenanceLogEnabled = api.customDomain.setMaintenanceLogEnabled.useMutation({
+    onSuccess: () => onChanged(),
+    onError: (err) => toast.error(err.message),
+  })
+  const setReminderEnabled = api.customDomain.setReminderEnabled.useMutation({
+    onSuccess: () => onChanged(),
+    onError: (err) => toast.error(err.message),
+  })
+  const setTabOrder = api.customDomain.setTabOrder.useMutation({
+    onSuccess: () => onChanged(),
+    onError: (err) => toast.error(err.message),
+  })
+  const tabOrder: TabKey[] = domain.tabOrder.length > 0 ? (domain.tabOrder as TabKey[]) : DEFAULT_TAB_ORDER
+  function moveTab(index: number, direction: -1 | 1) {
+    const target = index + direction
+    if (target < 0 || target >= tabOrder.length) return
+    const next = [...tabOrder]
+    ;[next[index], next[target]] = [next[target]!, next[index]!]
+    setTabOrder.mutate({ id: domain.id, tabOrder: next })
+  }
 
   const loggableFieldCount = domain.fields.filter((f) => f.loggable && !f.archivedAt).length
   const isPublished = domain.isPublished
@@ -188,6 +222,65 @@ function DomainRow({ domain, onChanged }: { domain: DomainForRow; onChanged: () 
               <Link href="/custom-domains/published" className="underline">My published domains</Link>.
             </p>
           )}
+          <Separator />
+          <div className="flex items-center justify-between">
+            <div>
+              <Label htmlFor={`maintenance-log-${domain.id}`} className="text-sm font-medium">Maintenance Log</Label>
+              <p className="text-xs text-muted-foreground">Show a Maintenance Log tab on items in this domain.</p>
+            </div>
+            <Switch
+              id={`maintenance-log-${domain.id}`}
+              checked={domain.maintenanceLogEnabled}
+              onCheckedChange={(checked) => setMaintenanceLogEnabled.mutate({ id: domain.id, enabled: checked })}
+              disabled={setMaintenanceLogEnabled.isPending}
+            />
+          </div>
+
+          <Separator />
+          <div className="flex items-center justify-between">
+            <div>
+              <Label htmlFor={`reminders-${domain.id}`} className="text-sm font-medium">Reminders</Label>
+              <p className="text-xs text-muted-foreground">Show a Reminders tab on items in this domain.</p>
+            </div>
+            <Switch
+              id={`reminders-${domain.id}`}
+              checked={domain.reminderEnabled}
+              onCheckedChange={(checked) => setReminderEnabled.mutate({ id: domain.id, enabled: checked })}
+              disabled={setReminderEnabled.isPending}
+            />
+          </div>
+
+          <Separator />
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Tab order</p>
+            <p className="text-xs text-muted-foreground">Controls the order tabs appear in on items in this domain.</p>
+            {tabOrder.map((key, index) => (
+              <div key={key} className="flex items-center justify-between text-sm py-1">
+                <span>{TAB_LABELS[key] ?? key}</span>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    disabled={index === 0 || setTabOrder.isPending}
+                    onClick={() => moveTab(index, -1)}
+                  >
+                    <ChevronUp className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    disabled={index === tabOrder.length - 1 || setTabOrder.isPending}
+                    onClick={() => moveTab(index, 1)}
+                  >
+                    <ChevronDown className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+
           <Separator />
           <div className="space-y-2">
             <p className="text-sm font-medium">Profile fields</p>

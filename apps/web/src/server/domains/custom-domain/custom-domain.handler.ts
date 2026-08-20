@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { FieldType } from '@prisma/client'
 import { createTRPCRouter, protectedProcedure } from '@/server/trpc'
 import { CustomDomainRepository } from './custom-domain.repository'
-import { CustomDomainService } from './custom-domain.service'
+import { CustomDomainService, TAB_KEYS } from './custom-domain.service'
 import { ItemRepository } from '@/server/domains/item/item.repository'
 
 export const customDomainRouter = createTRPCRouter({
@@ -23,6 +23,30 @@ export const customDomainRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const service = new CustomDomainService(new CustomDomainRepository(ctx.db), new ItemRepository(ctx.db))
       await service.delete(input.id, ctx.userId)
+      return { success: true }
+    }),
+
+  setMaintenanceLogEnabled: protectedProcedure
+    .input(z.object({ id: z.string(), enabled: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      const service = new CustomDomainService(new CustomDomainRepository(ctx.db), new ItemRepository(ctx.db))
+      await service.setMaintenanceLogEnabled(input.id, ctx.userId, input.enabled)
+      return { success: true }
+    }),
+
+  setReminderEnabled: protectedProcedure
+    .input(z.object({ id: z.string(), enabled: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      const service = new CustomDomainService(new CustomDomainRepository(ctx.db), new ItemRepository(ctx.db))
+      await service.setReminderEnabled(input.id, ctx.userId, input.enabled)
+      return { success: true }
+    }),
+
+  setTabOrder: protectedProcedure
+    .input(z.object({ id: z.string(), tabOrder: z.array(z.enum(TAB_KEYS)) }))
+    .mutation(async ({ ctx, input }) => {
+      const service = new CustomDomainService(new CustomDomainRepository(ctx.db), new ItemRepository(ctx.db))
+      await service.setTabOrder(input.id, ctx.userId, input.tabOrder)
       return { success: true }
     }),
 

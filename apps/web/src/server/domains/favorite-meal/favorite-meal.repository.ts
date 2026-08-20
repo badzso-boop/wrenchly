@@ -1,4 +1,5 @@
 import type { PrismaClient, FavoriteMeal } from '@prisma/client'
+import { TRPCError } from '@trpc/server'
 import { resolveItemAccess } from '../item/item-access.service'
 
 export class FavoriteMealRepository {
@@ -18,6 +19,9 @@ export class FavoriteMealRepository {
   }
 
   async create(data: { userId: string; itemId: string; name: string; notes: string | null }): Promise<FavoriteMeal> {
+    const access = await resolveItemAccess(this.db, data.itemId, data.userId)
+    if (!access) throw new TRPCError({ code: 'FORBIDDEN', message: 'errors.item.no_access' })
+
     return this.db.favoriteMeal.create({ data })
   }
 

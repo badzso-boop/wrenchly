@@ -129,9 +129,17 @@ pnpm typecheck
 A repó gyökerében van egy `Dockerfile` (pnpm workspace-aware, multi-stage, Next.js
 `output: standalone` build) és egy `docker-compose.yml`.
 
-A compose stack **saját Postgres konténert is indít** (`db`, `postgres:16-alpine`) — nincs szükség
-külső Supabase/Neon/RDS projektre, bár ha mégis azt szeretnél, a `.env`-ben felülírható a
-`DATABASE_URL`/`DIRECT_URL` (ld. `docker-compose.yml` a pontos fallback-logikáért).
+A compose stack **saját Postgres konténert is tud indítani** (`db`, `postgres:16-alpine`) —
+nincs szükség külső Supabase/Neon/RDS projektre, bár ha mégis azt szeretnél, a `.env`-ben
+felülírható a `DATABASE_URL`/`DIRECT_URL` (ld. `docker-compose.yml` a pontos fallback-logikáért).
+
+> **⚠️ 2026-08-19 óta a `db` service a `standalone` Compose profil mögé került** — sima
+> `docker compose up -d --build` már **nem** indítja el. Friss klónnál, saját lokális
+> adatbázissal a `--profile standalone` flaget add hozzá (lásd lentebb). Ennek oka: a
+> `wrenchly.ujjweb.hu`-t futtató homelab szerveren a `db` szándékosan nem fut — az app egy
+> közös, több projektet (wrenchly, legymernok) kiszolgáló Postgres instance-hoz kapcsolódik
+> a `.env`-ben beállított `DATABASE_URL`/`DIRECT_URL`-en keresztül. Teljes leírás:
+> `~/homelab/SHARED-POSTGRES.md` (szerver-szintű dokumentum, nem repó-specifikus).
 
 1. Hozz létre egy `.env` fájlt a repó gyökerében (**nem** `apps/web/` alatt — a `docker-compose.yml`
    onnan olvassa) az `apps/web/.env.example` alapján, valós `BETTER_AUTH_SECRET`/Brevo
@@ -139,7 +147,7 @@ külső Supabase/Neon/RDS projektre, bár ha mégis azt szeretnél, a `.env`-ben
 2. Build + indítás:
 
    ```bash
-   docker compose up -d --build
+   docker compose --profile standalone up -d --build
    ```
 
    Az app a konténeren belül a 3000-es porton fut, kifelé `127.0.0.1:8086`-on érhető el.

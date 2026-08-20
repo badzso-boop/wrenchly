@@ -1,4 +1,5 @@
 import type { PrismaClient, CookingLogEntry, ShoppingListItem } from '@prisma/client'
+import { TRPCError } from '@trpc/server'
 import { resolveItemAccess } from '../item/item-access.service'
 
 export class CookingRepository {
@@ -32,6 +33,9 @@ export class CookingRepository {
     linkedTransactionId: string | null
     cookedAt: Date
   }): Promise<CookingLogEntry> {
+    const access = await resolveItemAccess(this.db, data.itemId, data.userId)
+    if (!access) throw new TRPCError({ code: 'FORBIDDEN', message: 'errors.item.no_access' })
+
     return this.db.cookingLogEntry.create({ data })
   }
 
