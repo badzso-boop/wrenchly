@@ -39,6 +39,26 @@ describe('MaintenanceService.create', () => {
     )
   })
 
+  it('subtracts a negative unitPrice (discount) from costTotal', async () => {
+    const input = {
+      itemId: 'item-1',
+      title: 'Oil change',
+      category: 'oil_change',
+      performedAt: new Date(),
+      parts: [
+        { name: 'Castrol 5W-40', quantity: 5, unit: 'liter', unitPrice: 4200 },
+        { name: 'Loyalty discount', quantity: 1, unit: 'pcs', unitPrice: -2000 },
+      ],
+    }
+    mockMaintenanceRepo.create.mockResolvedValue({ id: 'rec-1', costTotal: 19000 })
+
+    await service.create('user-1', input)
+
+    expect(mockMaintenanceRepo.create).toHaveBeenCalledWith(
+      expect.objectContaining({ costTotal: 19000 })
+    )
+  })
+
   it('sets costTotal to 0 when no parts', async () => {
     const input = {
       itemId: 'item-1',
