@@ -32,12 +32,14 @@ RUN mkdir -p apps/web/public
 # never read for it. It must be the real public URL, not a throwaway placeholder, or Better Auth's
 # baseURL ends up wrong and it rejects every request with "Invalid origin".
 ARG NEXT_PUBLIC_APP_URL=https://wrenchly.ujjweb.hu
+ARG NEXT_PUBLIC_UMAMI_WEBSITE_ID=
 ENV DATABASE_URL=postgresql://user:pass@localhost:5432/db \
     DIRECT_URL=postgresql://user:pass@localhost:5432/db \
     BETTER_AUTH_SECRET=build-placeholder-must-be-32-chars-min \
     BREVO_API_KEY=build_placeholder \
     CRON_SECRET=build-placeholder-must-be-32-chars-min \
-    NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
+    NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL} \
+    NEXT_PUBLIC_UMAMI_WEBSITE_ID=${NEXT_PUBLIC_UMAMI_WEBSITE_ID}
 RUN pnpm --filter @wrenchly/web db:generate
 RUN pnpm --filter @wrenchly/web build
 
