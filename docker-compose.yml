@@ -27,6 +27,8 @@ services:
     build:
       context: .
       target: runner
+      args:
+        NEXT_PUBLIC_UMAMI_WEBSITE_ID: ${NEXT_PUBLIC_UMAMI_WEBSITE_ID:-}
     container_name: wrenchly
     restart: unless-stopped
     # Nincs explicit depends_on a `db` service-re: profil mögé került (lásd
